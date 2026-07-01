@@ -1,8 +1,9 @@
 name: Build & Release Mods
 
-# Every push/merge to main builds all mods and publishes the packaged zip as a GitHub Release.
-# The proprietary reference DLLs are NOT in git; they're pulled from the private 'refs' release
-# asset (created once with tools/make-refs.ps1) using the automatic GITHUB_TOKEN.
+# Every push/merge to main builds all mods and publishes one zip per mod as a GitHub Release.
+# The proprietary reference DLLs are NOT in git; they're pulled from the 'refs' release asset in the
+# private Osanchez/PunkMods-refs repo, using a fine-grained PAT stored as the REFS_TOKEN secret.
+# (This repo can therefore be public without exposing those DLLs.)
 on:
   push:
     branches: [main]
@@ -27,18 +28,19 @@ jobs:
         with:
           dotnet-version: '8.0.x'
 
-      - name: Download reference DLLs (private 'refs' release asset)
+      - name: Download reference DLLs (private PunkMods-refs release asset)
         env:
-          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GH_TOKEN: ${{ secrets.REFS_TOKEN }}
         shell: pwsh
         run: |
+          if (-not $env:GH_TOKEN) { throw "REFS_TOKEN secret is not set. Create a fine-grained PAT with read access to Osanchez/PunkMods-refs and add it as the REFS_TOKEN secret." }
           New-Item -ItemType Directory -Force -Path gamedir | Out-Null
-          gh release download refs --repo $env:GITHUB_REPOSITORY --pattern punk-refs.zip --dir . --clobber
+          gh release download refs --repo Osanchez/PunkMods-refs --pattern punk-refs.zip --dir . --clobber
           Expand-Archive -Path punk-refs.zip -DestinationPath gamedir -Force
 
-      - name: Build & package
+      - name: Build & package (one zip per mod)
         shell: pwsh
-        run: ./build-package.ps1 -GameDir "$PWD/gamedir" -Ci
+        run: ./build-package.ps1 -GameDir "$PWD/gamedir" -Ci -PerMod
 
       - name: Compute version tag
         id: ver
@@ -52,5 +54,5 @@ jobs:
         with:
           tag_name: ${{ steps.ver.outputs.tag }}
           name: PUNK Mods ${{ steps.ver.outputs.tag }}
-          files: dist/PUNK-Mods-*.zip
+          files: dist/*.zip
           generate_release_notes: true
