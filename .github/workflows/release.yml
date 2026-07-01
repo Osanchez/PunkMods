@@ -7,6 +7,10 @@ name: Build & Release Mods
 on:
   push:
     branches: [main]
+    paths-ignore:           # doc-only changes don't warrant a build + release
+      - '**.md'
+      - '.gitignore'
+      - 'LICENSE'
   workflow_dispatch:        # lets you also trigger a build manually from the Actions tab
 
 permissions:
