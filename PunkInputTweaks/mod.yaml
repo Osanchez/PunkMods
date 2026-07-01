@@ -1,0 +1,5 @@
+# Metadata for the MODS menu section header: "<name> By <author> (v<version>)".
+name: Input Tweaks
+author: Trihardest
+version: 1.0.0
+description: Raises the Input System polling rate to cut gamepad input latency (helps controller and Remote Play players).

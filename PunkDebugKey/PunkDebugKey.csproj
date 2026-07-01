@@ -1,0 +1,61 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <!-- Unity 6 Mono plugins target netstandard2.1. -->
+    <TargetFramework>netstandard2.1</TargetFramework>
+    <AssemblyName>PunkDebugKey</AssemblyName>
+    <Version>1.0.0</Version>
+    <LangVersion>latest</LangVersion>
+    <Nullable>disable</Nullable>
+    <AppendTargetFrameworkToOutputPath>false</AppendTargetFrameworkToOutputPath>
+    <EnableDefaultCompileItems>true</EnableDefaultCompileItems>
+
+    <!-- Root of the game install. Adjust if yours differs. -->
+    <GameDir>C:\Program Files (x86)\Steam\steamapps\common\PUNK Playtest</GameDir>
+    <ManagedDir>$(GameDir)\Punk_Data\Managed</ManagedDir>
+    <BepInExCore>$(GameDir)\BepInEx\core</BepInExCore>
+  </PropertyGroup>
+
+  <!-- BepInEx 6 (Mono) + Harmony. These DLLs exist after you install BepInEx into the game.
+       BepInEx 5 users: reference $(BepInExCore)\BepInEx.dll instead of the two split
+       assemblies below, and delete `using BepInEx.Unity.Mono;` from Plugin.cs. -->
+  <ItemGroup>
+    <Reference Include="BepInEx.Core">
+      <HintPath>$(BepInExCore)\BepInEx.Core.dll</HintPath>
+      <Private>false</Private>
+    </Reference>
+    <Reference Include="BepInEx.Unity.Mono">
+      <HintPath>$(BepInExCore)\BepInEx.Unity.Mono.dll</HintPath>
+      <Private>false</Private>
+    </Reference>
+    <Reference Include="0Harmony">
+      <HintPath>$(BepInExCore)\0Harmony.dll</HintPath>
+      <Private>false</Private>
+    </Reference>
+  </ItemGroup>
+
+  <!-- Game + Unity assemblies (never copied to output: Private=false). -->
+  <ItemGroup>
+    <Reference Include="Punk.Main">
+      <HintPath>$(ManagedDir)\Punk.Main.dll</HintPath>
+      <Private>false</Private>
+    </Reference>
+    <Reference Include="ServiceLocator">
+      <HintPath>$(ManagedDir)\ServiceLocator.dll</HintPath>
+      <Private>false</Private>
+    </Reference>
+    <Reference Include="UnityEngine">
+      <HintPath>$(ManagedDir)\UnityEngine.dll</HintPath>
+      <Private>false</Private>
+    </Reference>
+    <Reference Include="UnityEngine.CoreModule">
+      <HintPath>$(ManagedDir)\UnityEngine.CoreModule.dll</HintPath>
+      <Private>false</Private>
+    </Reference>
+    <Reference Include="Unity.InputSystem">
+      <HintPath>$(ManagedDir)\Unity.InputSystem.dll</HintPath>
+      <Private>false</Private>
+    </Reference>
+  </ItemGroup>
+
+</Project>

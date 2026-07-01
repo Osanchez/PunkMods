@@ -1,0 +1,5 @@
+# Metadata for the MODS menu section header: "<name> By <author> (v<version>)".
+name: Sim Controller
+author: Trihardest
+version: 1.0.0
+description: Debug tool that spawns simulated controllers to test the co-op join and start flow without extra hardware.

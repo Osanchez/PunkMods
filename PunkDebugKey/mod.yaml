@@ -1,0 +1,5 @@
+# Metadata for the MODS menu section header: "<name> By <author> (v<version>)".
+name: Debug Menu Key
+author: Trihardest
+version: 2.1.0
+description: Opens the game's built-in developer debug menu with F1.

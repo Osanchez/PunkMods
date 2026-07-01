@@ -1,0 +1,5 @@
+# Metadata for the MODS menu section header: "<name> By <author> (v<version>)".
+name: Mods Menu
+author: Trihardest
+version: 2.1.0
+description: Framework that adds a MODS tab to Settings; other mods register toggles, lists, and buttons into it.

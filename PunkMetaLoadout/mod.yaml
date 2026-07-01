@@ -1,0 +1,5 @@
+# Metadata for the MODS menu section header: "<name> By <author> (v<version>)".
+name: Meta Loadout
+author: Trihardest
+version: 2.0.0
+description: Persists each player's ship build per class and profile across runs; profiles are chosen on the player-select screen.

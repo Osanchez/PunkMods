@@ -1,0 +1,5 @@
+# Metadata for the MODS menu section header: "<name> By <author> (v<version>)".
+name: Player Highlight
+author: Trihardest
+version: 2.0.0
+description: Draws a neon ring and a P1-P4 label around each player's ship so you can spot yourself quickly.

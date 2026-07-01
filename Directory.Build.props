@@ -1,0 +1,7 @@
+<Project>
+  <!-- Shared metadata for every PUNK mod. The author is read back at runtime (AssemblyCompany)
+       by PunkModsMenu to label each section in the MODS tab. Change it here for all mods at once. -->
+  <PropertyGroup>
+    <Company>Trihardest</Company>
+  </PropertyGroup>
+</Project>

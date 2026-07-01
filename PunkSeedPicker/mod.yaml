@@ -1,0 +1,5 @@
+# Metadata for the MODS menu section header: "<name> By <author> (v<version>)".
+name: Seed Picker
+author: Trihardest
+version: 1.0.0
+description: Adds a world-seed entry screen after class selection so you can type or randomize the run's seed.

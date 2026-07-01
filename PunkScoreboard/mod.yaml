@@ -1,0 +1,5 @@
+# Metadata for the MODS menu section header: "<name> By <author> (v<version>)".
+name: Scoreboard
+author: Trihardest
+version: 1.1.0
+description: Hold Tab for a co-op scoreboard - per-player kills, bosses, deaths, damage dealt, time alive, HP, and fuel.

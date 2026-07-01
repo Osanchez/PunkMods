@@ -1,0 +1,5 @@
+# Metadata for the MODS menu section header: "<name> By <author> (v<version>)".
+name: Revive Item
+author: Trihardest
+version: 1.0.0
+description: Adds the Revive Beacon, a 2500-coin shop consumable that revives a random downed player at the user's position.

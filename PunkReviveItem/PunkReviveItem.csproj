@@ -1,0 +1,30 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <TargetFramework>netstandard2.1</TargetFramework>
+    <AssemblyName>PunkReviveItem</AssemblyName>
+    <Version>1.0.0</Version>
+    <LangVersion>latest</LangVersion>
+    <Nullable>disable</Nullable>
+    <AppendTargetFrameworkToOutputPath>false</AppendTargetFrameworkToOutputPath>
+
+    <GameDir>C:\Program Files (x86)\Steam\steamapps\common\PUNK Playtest</GameDir>
+    <ManagedDir>$(GameDir)\Punk_Data\Managed</ManagedDir>
+    <BepInExCore>$(GameDir)\BepInEx\core</BepInExCore>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <Reference Include="BepInEx.Core">      <HintPath>$(BepInExCore)\BepInEx.Core.dll</HintPath>       <Private>false</Private></Reference>
+    <Reference Include="BepInEx.Unity.Mono"><HintPath>$(BepInExCore)\BepInEx.Unity.Mono.dll</HintPath> <Private>false</Private></Reference>
+    <Reference Include="0Harmony">          <HintPath>$(BepInExCore)\0Harmony.dll</HintPath>           <Private>false</Private></Reference>
+  </ItemGroup>
+
+  <ItemGroup>
+    <Reference Include="Punk.Main">              <HintPath>$(ManagedDir)\Punk.Main.dll</HintPath>              <Private>false</Private></Reference>
+    <Reference Include="ServiceLocator">         <HintPath>$(ManagedDir)\ServiceLocator.dll</HintPath>         <Private>false</Private></Reference>
+    <Reference Include="UnityEngine">            <HintPath>$(ManagedDir)\UnityEngine.dll</HintPath>            <Private>false</Private></Reference>
+    <Reference Include="UnityEngine.CoreModule"> <HintPath>$(ManagedDir)\UnityEngine.CoreModule.dll</HintPath> <Private>false</Private></Reference>
+    <Reference Include="UnityEngine.Physics2DModule"><HintPath>$(ManagedDir)\UnityEngine.Physics2DModule.dll</HintPath><Private>false</Private></Reference>
+  </ItemGroup>
+
+</Project>
