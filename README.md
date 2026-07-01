@@ -2,6 +2,16 @@
 
 A suite of [BepInEx](https://github.com/BepInEx/BepInEx) / Harmony mods for the Unity game **PUNK** (Steam Playtest), by **Trihardest**.
 
+## Install
+
+Grab the [latest release](https://github.com/Osanchez/PunkMods/releases/latest):
+
+1. Extract **`BepInEx-Setup.zip`** into your PUNK Playtest folder (next to `Punk.exe`) — **once**. This installs the BepInEx loader.
+2. Extract each **`<Mod>.zip`** you want into the same folder (each drops `BepInEx/plugins/<Mod>/`).
+3. Launch the game, then open **Settings → MODS** to configure them.
+
+Update a mod by re-extracting its zip; remove one by deleting its `BepInEx/plugins/<Mod>/` folder.
+
 ## Mods
 
 ### Framework / UI
@@ -25,14 +35,21 @@ A suite of [BepInEx](https://github.com/BepInEx/BepInEx) / Harmony mods for the 
 
 ## Building
 
-Each mod is a `netstandard2.1` project referencing the game's `Punk_Data/Managed` DLLs and BepInEx core (paths are set in each `.csproj` / `Directory.Build.props`).
+Each mod is a `netstandard2.1` project referencing the game's `Punk_Data/Managed` DLLs and BepInEx core via `HintPath`s under the `GameDir` MSBuild property (defaults to the game install; override with `-p:GameDir=...`).
 
 ```
-# build + deploy to the local install + package a distributable zip
+# build + deploy to the local install + package a single all-in-one bundle
 powershell -ExecutionPolicy Bypass -File build-package.ps1
+
+# or one zip per mod + BepInEx-Setup.zip (what CI publishes)
+powershell -ExecutionPolicy Bypass -File build-package.ps1 -PerMod
 ```
 
-The script auto-discovers every `*.csproj`, builds it, copies each mod's DLL (+ `mod.yaml`) into `BepInEx/plugins/<Mod>/`, and zips everything with the BepInEx loader into `dist/`.
+The script auto-discovers every `*.csproj`, builds it, copies each mod's DLL (+ `mod.yaml`) into `BepInEx/plugins/<Mod>/`, and zips the result into `dist/`.
+
+### Releases
+
+Pushes/merges to `main` build every mod and publish a **per-mod GitHub Release** automatically (one `<Mod>.zip` each, plus `BepInEx-Setup.zip`). See **[RELEASING.md](RELEASING.md)** for the CI setup, the private reference-DLL repo, and how to refresh the DLLs after a game update.
 
 ## Per-mod metadata
 
