@@ -6,9 +6,16 @@
 # Output: Mods\dist\PUNK-Mods-<date>.zip
 # (Includes BepInEx + all mod DLLs + INSTALL.md. Does NOT include any game files.)
 
+param(
+    # Root of the game install to build/reference against. Defaults to the folder above Mods\
+    # (your local Steam install). CI passes the extracted reference-DLL stub here instead.
+    [string]$GameDir,
+    # CI mode: skip refreshing your local BepInEx\plugins install (there isn't one on a runner).
+    [switch]$Ci
+)
 $ErrorActionPreference = 'Stop'
 $ModsDir = $PSScriptRoot
-$GameDir = Split-Path $ModsDir -Parent
+if (-not $GameDir) { $GameDir = Split-Path $ModsDir -Parent }
 $DistDir = Join-Path $ModsDir 'dist'
 $Stage   = Join-Path $DistDir 'PUNK-Mods'
 $Stamp   = Get-Date -Format 'yyyyMMdd'
@@ -23,7 +30,7 @@ if (-not $projects) { throw "No .csproj projects found under $ModsDir" }
 
 foreach ($p in $projects) {
     Write-Host "Building $($p.BaseName) ..." -ForegroundColor Cyan
-    dotnet build $p.FullName -c Release -v quiet | Out-Null
+    dotnet build $p.FullName -c Release -v quiet -p:GameDir="$GameDir" | Out-Null
     if ($LASTEXITCODE -ne 0) { throw "Build failed: $($p.Name)" }
 }
 
@@ -70,7 +77,10 @@ Copy-Item (Join-Path $ModsDir 'INSTALL.md') $Stage -Force
 
 # 2d) Refresh THIS install's plugins too (per-mod folders), unless the game is running and locks them.
 $livePlugins = Join-Path $GameDir 'BepInEx\plugins'
-if (Get-Process Punk -ErrorAction SilentlyContinue) {
+if ($Ci) {
+    Write-Host "CI mode - skipped refreshing local install." -ForegroundColor DarkGray
+}
+elseif (Get-Process Punk -ErrorAction SilentlyContinue) {
     Write-Warning "Game is running - skipped updating your own install (close it and re-run to refresh locally)."
 }
 elseif (Test-Path $livePlugins) {

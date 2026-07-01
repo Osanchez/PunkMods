@@ -8,6 +8,11 @@ dist/
 # Staging folder used while packaging
 dist/PUNK-Mods/
 
+# CI reference-DLL bundle (proprietary — never commit; lives in the private 'refs' release asset)
+dist-refs/
+punk-refs.zip
+gamedir/
+
 # Editor / user files
 .vs/
 *.user

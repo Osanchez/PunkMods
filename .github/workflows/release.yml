@@ -1,0 +1,56 @@
+name: Build & Release Mods
+
+# Every push/merge to main builds all mods and publishes the packaged zip as a GitHub Release.
+# The proprietary reference DLLs are NOT in git; they're pulled from the private 'refs' release
+# asset (created once with tools/make-refs.ps1) using the automatic GITHUB_TOKEN.
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:        # lets you also trigger a build manually from the Actions tab
+
+permissions:
+  contents: write           # required to download the 'refs' asset and to create Releases
+
+concurrency:
+  group: release
+  cancel-in-progress: false
+
+jobs:
+  build:
+    runs-on: windows-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup .NET SDK
+        uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: '8.0.x'
+
+      - name: Download reference DLLs (private 'refs' release asset)
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        shell: pwsh
+        run: |
+          New-Item -ItemType Directory -Force -Path gamedir | Out-Null
+          gh release download refs --repo $env:GITHUB_REPOSITORY --pattern punk-refs.zip --dir . --clobber
+          Expand-Archive -Path punk-refs.zip -DestinationPath gamedir -Force
+
+      - name: Build & package
+        shell: pwsh
+        run: ./build-package.ps1 -GameDir "$PWD/gamedir" -Ci
+
+      - name: Compute version tag
+        id: ver
+        shell: pwsh
+        run: |
+          $tag = "v{0}.{1}" -f (Get-Date -Format 'yyyy.MM.dd'), '${{ github.run_number }}'
+          "tag=$tag" | Out-File -FilePath $env:GITHUB_OUTPUT -Append
+
+      - name: Publish Release
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: ${{ steps.ver.outputs.tag }}
+          name: PUNK Mods ${{ steps.ver.outputs.tag }}
+          files: dist/PUNK-Mods-*.zip
+          generate_release_notes: true
