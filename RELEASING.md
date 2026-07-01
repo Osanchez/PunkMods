@@ -1,53 +1,62 @@
 # Automated releases
 
-Every push/merge to `main` builds all mods and publishes the packaged zip as a GitHub **Release**
-(tagged `vYYYY.MM.DD.<run-number>`). See `.github/workflows/release.yml`.
+Every push/merge to `main` builds all mods and publishes a GitHub **Release** (tagged
+`vYYYY.MM.DD.<run-number>`) with **one zip per mod** plus a one-time `BepInEx-Setup.zip`.
+See `.github/workflows/release.yml`.
 
-The mods compile against proprietary game / Unity / BepInEx DLLs that are **not** in git. CI pulls
-them from a private release asset called **`refs`**, created once with `tools/make-refs.ps1`.
+## Repository layout
 
-> ⚠️ Keep this repo **private**. `punk-refs.zip` contains closed-playtest and Unity assemblies that
-> may not be redistributed. It is git-ignored and only ever lives as a private release asset.
+- **`Osanchez/PunkMods`** (this repo) — source, workflow, and public releases. Safe to be public:
+  git history contains no binaries, and the released zips contain only BepInEx (open source) + our
+  own mod DLLs. **No proprietary game/Unity DLLs are ever published.**
+- **`Osanchez/PunkMods-refs`** (private) — holds `punk-refs.zip`, the proprietary game / Unity /
+  BepInEx assemblies the mods *compile* against. CI downloads it using the `REFS_TOKEN` secret.
+
+## What friends download
+
+- `BepInEx-Setup.zip` — extract into the game folder **once** (installs the BepInEx loader).
+- `<Mod>.zip` — extract into the game folder for each mod you want (drops
+  `BepInEx/plugins/<Mod>/`). Update a mod by re-extracting its zip.
 
 ## One-time setup
 
-1. **Create the private repo** (run from inside `Mods\`):
-   ```pwsh
-   git init -b main
-   git add .
-   git commit -m "PUNK mods + CI release pipeline"
-   gh repo create <owner>/PUNK-Mods --private --source . --remote origin --push
+1. **Private refs repo + bundle** (done): `Osanchez/PunkMods-refs` exists and its `refs` release holds
+   `punk-refs.zip`, produced by `tools/make-refs.ps1`.
+2. **`REFS_TOKEN` secret** — create a **fine-grained PAT** (github.com → Settings → Developer settings
+   → Fine-grained tokens) with **Only select repositories → PunkMods-refs** and **Repository
+   permissions → Contents: Read-only**. Then add it to this repo:
+   ```bash
+   gh secret set REFS_TOKEN --repo Osanchez/PunkMods --body '<paste-PAT>'
    ```
-   (Or create the private repo on github.com and `git remote add origin ... ; git push -u origin main`.)
 
-2. **Build and upload the reference DLLs** the CI compiles against:
-   ```pwsh
-   powershell -ExecutionPolicy Bypass -File tools\make-refs.ps1
-   gh release create refs punk-refs.zip --repo <owner>/PUNK-Mods --prerelease `
-     --title "CI refs" --notes "Reference assemblies for CI - do not distribute"
+## Making this repo public (optional)
+
+Do these in order so nothing breaks:
+1. Confirm the `REFS_TOKEN` secret is set (above) and a build has succeeded with it.
+2. Delete the now-unused old refs asset from *this* repo:
+   ```bash
+   gh release delete refs --repo Osanchez/PunkMods --cleanup-tag --yes
    ```
-   No `gh`? Create the release manually on github.com: tag it `refs`, mark it a pre-release, and
-   attach `punk-refs.zip`.
+3. Flip visibility:
+   ```bash
+   gh repo edit Osanchez/PunkMods --visibility public --accept-visibility-change-consequences
+   ```
+   (Fork PRs won't have `REFS_TOKEN`, so their builds skip — only your pushes to `main` release.)
 
-   > The `refs` release must exist **before** the first `main` build, or the download step fails.
-   > If the very first run failed for this reason, just re-run it from the Actions tab afterward.
+## After a game update (keep the reference DLLs fresh)
 
-That's it. From now on, every push to `main` produces a Release automatically. You can also trigger
-one manually from the **Actions** tab ("Build & Release Mods" → *Run workflow*).
-
-## When you add a NEW DLL reference to a mod
-
-CI only has the DLLs captured in `refs`. If you add a `<Reference>` to a new game/Unity assembly,
-refresh the bundle:
+The game can update and shift the assemblies the mods compile against. Refresh in one step:
 ```pwsh
-powershell -ExecutionPolicy Bypass -File tools\make-refs.ps1
-gh release upload refs punk-refs.zip --repo <owner>/PUNK-Mods --clobber
+powershell -ExecutionPolicy Bypass -File tools\update-refs.ps1
 ```
+This rebuilds `punk-refs.zip` from your current install and re-uploads it to the `refs` release in
+`PunkMods-refs` (falls back to `wsl gh` if `gh` isn't on Windows PATH). The next push to `main`
+builds against the refreshed DLLs. Run it too whenever you add a new `<Reference>` to a mod.
 
 ## How it fits together
 
-- `build-package.ps1 -GameDir <dir> -Ci` — the existing packager, now parameterized. `-GameDir`
-  overrides MSBuild's `GameDir` (via a global `-p:` property, so no `.csproj` changes), and `-Ci`
-  skips refreshing your local `BepInEx\plugins`. Run with no args, it behaves exactly as before.
-- `tools/make-refs.ps1` — parses every `.csproj`, copies the referenced DLLs (plus the BepInEx
-  loader + `BepInEx.cfg`) into `punk-refs.zip`, mirroring the game folder layout.
+- `build-package.ps1` — no args: single all-in-one bundle (handy for local use). `-PerMod`: one zip
+  per mod + `BepInEx-Setup.zip` (what CI uses). `-GameDir` overrides the build/reference root;
+  `-Ci` skips refreshing your local `BepInEx\plugins`.
+- `tools/make-refs.ps1` — builds `punk-refs.zip` from your install (parses each `.csproj`).
+- `tools/update-refs.ps1` — make-refs + upload to the private refs release, in one command.
