@@ -105,7 +105,9 @@ namespace PunkFourPlayer
         {
             _font = UnityEngine.Object.FindObjectOfType<TMP_Text>()?.font;
 
-            var bg = NewImage(_canvas.transform, new Color(0f, 0f, 0f, 0.82f));
+            // Fully opaque backdrop so the player-select screen underneath can't show through
+            // (both the dim margins around the panel and any gap behind the on-screen keyboard).
+            var bg = NewImage(_canvas.transform, new Color(0.04f, 0.04f, 0.05f, 1f));
             Stretch(bg.rectTransform);
 
             var panel = Framed(_canvas.transform, Vector2.zero, new Vector2(760f, 660f), PanelFill, PanelBorder, 3f);

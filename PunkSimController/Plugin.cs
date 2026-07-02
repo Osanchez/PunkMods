@@ -33,6 +33,7 @@ namespace PunkSimController
     ///   Space / Enter   A button (confirm / ready / pick profile / use)
     ///   Arrows          D-pad (menus / item wheel)
     ///   F9              start the game (host)
+    ///   F11             show / hide this overlay (emulation keeps working)
     /// </summary>
     [BepInPlugin(Guid, Name, Version)]
     public class Plugin : BaseUnityPlugin
@@ -48,6 +49,10 @@ namespace PunkSimController
         private int _selected = -1;
         private int _counter;
         private GUIStyle _style;
+
+        // Whether the on-screen overlay is drawn. F11 toggles it; emulation (sims + hotkeys) keeps
+        // working while hidden — this only suppresses the OnGUI render. Runtime-only (resets to shown).
+        private bool _overlayVisible = true;
 
         // Whether the emulator is active. Persisted to this mod's own config (so it survives
         // restarts); also toggled in the Mods menu. When off: no overlay, no hotkeys, sims removed.
@@ -97,13 +102,15 @@ namespace PunkSimController
             if (kb.f6Key.wasPressedThisFrame) RemoveSelected();
             if (kb.f7Key.wasPressedThisFrame) Cycle(-1);   // select previous player to control
             if (kb.f8Key.wasPressedThisFrame) Cycle(+1);   // select next player to control
+            if (kb.f11Key.wasPressedThisFrame) _overlayVisible = !_overlayVisible;   // hide/show overlay only
 
             DriveSims(kb);
             BuildStatus();
         }
 
-        // Per-frame: for each sim, find its join-screen row (if the join screen is open) and read
-        // which column it's in and whether it's readied. Cached so OnGUI just renders strings.
+        // Per-frame status per sim, cached so OnGUI just renders strings:
+        //  - On the join screen: the column it's picking (P1..P4) + READY.
+        //  - In game (join screen gone): the actual player tag of the ship it's driving ("Player N").
         private void BuildStatus()
         {
             _status.Clear();
@@ -116,11 +123,53 @@ namespace PunkSimController
                     foreach (var r in rows)
                         if (r != null && r.gameObject.scene.IsValid() && r.Device == pad) { row = r; break; }
 
-                string col = row == null ? "<color=#888>—</color>" : ColLabel(row.Position);
-                string ready = (row != null && row.IsReady) ? "  <color=#7CFC7C>READY</color>" : "";
+                string info;
+                if (row != null)
+                {
+                    // join phase: show the chosen column + ready state
+                    string ready = row.IsReady ? "  <color=#7CFC7C>READY</color>" : "";
+                    info = ColLabel(row.Position) + ready;
+                }
+                else
+                {
+                    // in game: show the player tag of the ship this sim controls
+                    int slot = -1;
+                    if (pad != null) FindShipForPad(pad, out slot);
+                    info = slot >= 0
+                        ? $"<color=#FFD166>Player {slot + 1}</color>"
+                        : "<color=#888>—</color>";
+                }
+
                 string marker = (i == _selected) ? "<b>►</b>" : "   ";
-                _status.Add($"{marker} #{i + 1}   {col}{ready}");
+                _status.Add($"{marker} #{i + 1}   {info}");
             }
+        }
+
+        // The ship a given sim pad is driving (matched by input device), plus its 0-based player
+        // slot = its index in ShipManager.Ships (== the PLAYER N number after the slot-order fix).
+        // Returns null / slot -1 before ships exist or if the pad isn't bound to one.
+        private static Ship FindShipForPad(Gamepad pad, out int slot)
+        {
+            slot = -1;
+            try
+            {
+                var ships = ServiceLocator.Get<ShipManager>()?.Ships;
+                if (ships == null) return null;
+                int idx = 0;
+                foreach (var s in ships)
+                {
+                    var pi = s?.shipInput?.PlayerInput;
+                    if (pi != null)
+                    {
+                        var devs = pi.devices;
+                        for (int d = 0; d < devs.Count; d++)
+                            if (devs[d] == pad) { slot = idx; return s; }
+                    }
+                    idx++;
+                }
+            }
+            catch { }
+            return null;
         }
 
         // Map a row's Position to its player number via PunkFourPlayer's JoinLayout (which knows the
@@ -224,21 +273,11 @@ namespace PunkSimController
         {
             try
             {
-                var ships = ServiceLocator.Get<ShipManager>()?.Ships;
-                if (ships == null || ships.Count == 0) return Vector2.zero;
                 var mouse = Mouse.current;
                 var cam = Camera.main;
                 if (mouse == null || cam == null) return Vector2.zero;
 
-                Ship ship = null;
-                foreach (var s in ships)
-                {
-                    var pi = s?.shipInput?.PlayerInput;
-                    if (pi == null) continue;
-                    var devs = pi.devices;
-                    for (int d = 0; d < devs.Count; d++) if (devs[d] == pad) { ship = s; break; }
-                    if (ship != null) break;
-                }
+                var ship = FindShipForPad(pad, out _);
                 if (ship == null) return Vector2.zero;
 
                 Vector3 sp = cam.WorldToScreenPoint(ship.transform.position);
@@ -250,7 +289,7 @@ namespace PunkSimController
 
         private void OnGUI()
         {
-            if (!Enabled) return;
+            if (!Enabled || !_overlayVisible) return;
             if (_style == null)
                 _style = new GUIStyle(GUI.skin.label) { fontSize = 14, richText = true, wordWrap = false, normal = { textColor = Color.white } };
 
@@ -266,7 +305,7 @@ namespace PunkSimController
             float x = rect.x + 12, w = rect.width - 24, y = rect.y + pad;
 
             GUI.Label(new Rect(x, y, w, headH), $"<b>SIM CONTROLLERS: {_sims.Count}</b>", _style); y += headH;
-            GUI.Label(new Rect(x, y, w, hintH), "<size=12><color=#9aa0aa>F5 add   ·   F6 remove   ·   F7/F8 select player</color></size>", _style); y += hintH;
+            GUI.Label(new Rect(x, y, w, hintH), "<size=12><color=#9aa0aa>F5 add   ·   F6 remove   ·   F7/F8 select player   ·   F11 hide</color></size>", _style); y += hintH;
             GUI.Label(new Rect(x, y, w, hintH), "<size=12><color=#9aa0aa>WASD move · mouse aim · LMB/RMB fire · Q/E/R/F/Shift skills · Space use</color></size>", _style); y += hintH + gap;
 
             if (_sims.Count == 0)

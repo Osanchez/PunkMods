@@ -11,9 +11,13 @@ BepInEx / Harmony mods for the Unity 6 (Mono) game **PUNK** (Steam Playtest). Th
 ## Build
 
 ```
-powershell -ExecutionPolicy Bypass -File build-package.ps1          # build all + refresh local install + single bundle
-powershell -ExecutionPolicy Bypass -File build-package.ps1 -PerMod  # one zip per mod + BepInEx-Setup.zip (CI mode)
+powershell -File build-package.ps1          # build all + refresh local install + single bundle
+powershell -File build-package.ps1 -PerMod  # one zip per mod + BepInEx-Setup.zip (CI mode)
 ```
+
+The machine's `CurrentUser` execution policy is `RemoteSigned`, so this locally-authored script runs
+without an `-ExecutionPolicy Bypass` flag. Do **not** add that flag — it weakens a security control
+and Claude Code's auto-mode classifier hard-denies it.
 
 - Mods reference proprietary game/Unity/BepInEx DLLs via `HintPath`s under `$(ManagedDir)` /
   `$(BepInExCore)`, both derived from the **`GameDir`** MSBuild property. `GameDir` defaults to the
@@ -27,7 +31,8 @@ powershell -ExecutionPolicy Bypass -File build-package.ps1 -PerMod  # one zip pe
 - The proprietary reference DLLs are **never committed**. They live in the **private** repo
   `Osanchez/PunkMods-refs` (`refs` release → `punk-refs.zip`), pulled in CI via the `REFS_TOKEN` secret.
 - After a game update, or after adding a new DLL `<Reference>` to a mod, run `tools/update-refs.ps1`
-  to rebuild and re-upload the reference bundle.
+  to rebuild and re-upload the reference bundle. That also refreshes `game-version.json` (game
+  version + Steam build id, stamped into the Release description by CI) — **commit it**.
 
 ## Gotchas
 

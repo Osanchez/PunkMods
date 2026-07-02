@@ -80,7 +80,10 @@ namespace PunkPlayerHighlight
             {
                 var ship = ships[i];
                 if (ship == null) continue;
-                if (!_glows.TryGetValue(ship, out var g)) { g = Create(ship, i); _glows[ship] = g; }
+                if (!_glows.TryGetValue(ship, out var g))
+                {
+                    g = Create(ship, i); _glows[ship] = g;
+                }
                 if (g == null || g.root == null) continue;
 
                 // Only while actively flying: ship control is disabled in shop / pause / map / menus.

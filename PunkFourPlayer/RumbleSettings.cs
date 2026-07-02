@@ -60,10 +60,12 @@ namespace PunkFourPlayer
     [HarmonyPatch(typeof(GameplayOptionsTab), "OnOpened")]
     internal static class GameplayRumbleSliders
     {
+        private static readonly FieldInfo P1F = AccessTools.Field(typeof(GameplayOptionsTab), "p1RumbleSlider");
         private static readonly FieldInfo P2F = AccessTools.Field(typeof(GameplayOptionsTab), "p2RumbleSlider");
         private static readonly FieldInfo ItemsF = AccessTools.Field(typeof(OptionsTab), "items");
         private static readonly Dictionary<GameplayOptionsTab, (OptionsMenuItemSlider p3, OptionsMenuItemSlider p4)> _added
             = new Dictionary<GameplayOptionsTab, (OptionsMenuItemSlider, OptionsMenuItemSlider)>();
+        private static bool _dumped;
 
         private static void Postfix(GameplayOptionsTab __instance)
         {
@@ -76,6 +78,13 @@ namespace PunkFourPlayer
                 }
                 if (s.p3 != null) s.p3.Value = RumbleConfig.P3;   // re-sync each open
                 if (s.p4 != null) s.p4.Value = RumbleConfig.P4;
+
+                // one-time hierarchy dump so we can see the real row layout + clone state
+                if (!_dumped)
+                {
+                    _dumped = true;
+                    try { UiDump.Write("gameplay_tab_dump.txt", __instance.transform, "GameplayOptionsTab (rows incl. P3/P4 clones)"); } catch { }
+                }
             }
             catch (Exception e) { Plugin.Log.LogWarning($"P3/P4 rumble sliders failed: {e.Message}"); }
         }
@@ -83,14 +92,49 @@ namespace PunkFourPlayer
         private static (OptionsMenuItemSlider, OptionsMenuItemSlider) Create(GameplayOptionsTab tab)
         {
             var p2 = P2F.GetValue(tab) as OptionsMenuItemSlider;
-            if (p2 == null) return (null, null);
+            if (p2 == null) { Plugin.Log.LogWarning("[rumble] p2RumbleSlider was null; cannot add P3/P4."); return (null, null); }
+            var p1 = P1F.GetValue(tab) as OptionsMenuItemSlider;
 
-            var p3 = Clone(p2, "P3 RUMBLE", RumbleConfig.P3, v => RumbleConfig.P3 = v);
-            var p4 = Clone(p2, "P4 RUMBLE", RumbleConfig.P4, v => RumbleConfig.P4 = v);
+            // Match the vanilla label format ("<color=#..>P1</color>   GAMEPAD RUMBLE") but tint the
+            // "P3"/"P4" prefix with the same per-player palette used for the HUD labels/ship themes.
+            var p3 = Clone(p2, RumbleLabel(2), RumbleConfig.P3, v => RumbleConfig.P3 = v);
+            var p4 = Clone(p2, RumbleLabel(3), RumbleConfig.P4, v => RumbleConfig.P4 = v);
 
             int si = p2.transform.GetSiblingIndex();
             p3.transform.SetSiblingIndex(si + 1);
             p4.transform.SetSiblingIndex(si + 2);
+
+            // Position the clones. Instantiate copies P2's anchoredPosition verbatim; SetSiblingIndex
+            // only changes draw order, not position. If the rows are laid out manually (no LayoutGroup
+            // on the shared parent) the clones would sit exactly on top of P2 (invisible overlap), so
+            // we stack them below P2 by the measured P1->P2 row spacing. When a LayoutGroup drives the
+            // rows, sibling order already positions them and we leave anchoredPosition alone.
+            var parent = p2.transform.parent;
+            bool hasLayout = parent != null && parent.GetComponent<UnityEngine.UI.LayoutGroup>() != null;
+            if (!hasLayout && p2.transform is RectTransform r2)
+            {
+                var r1 = p1 != null ? p1.transform as RectTransform : null;
+                Vector2 step = r1 != null
+                    ? r2.anchoredPosition - r1.anchoredPosition                      // real row spacing (P1->P2)
+                    : new Vector2(0f, -(r2.rect.height > 1f ? r2.rect.height : 100f)); // fallback: one row height down
+                if (p3.transform is RectTransform r3) r3.anchoredPosition = r2.anchoredPosition + step;
+                if (p4.transform is RectTransform r4) r4.anchoredPosition = r2.anchoredPosition + step * 2f;
+            }
+            // CRITICAL: each row's visibility is driven by its AnimatedScreenElement animator ("Visible"
+            // bool). The parent AnimatedScreen caches its element list in Awake and only Show()s that
+            // cached set during the open animation — our clones were added later, so without this they
+            // stay in the animator's default (hidden) state: present and sized, but invisible. Refresh
+            // the cached list (so open/close animations include them) and Show() them immediately in
+            // case the open animation already enumerated its list this frame.
+            var screen = tab.GetComponent<AnimatedScreen>();
+            if (screen != null) screen.RefreshElementList();
+            foreach (var el in new[] { p3, p4 })
+            {
+                var ase = el.GetComponent<AnimatedScreenElement>();
+                if (ase != null) ase.Show();
+            }
+
+            Plugin.Log.LogInfo($"[rumble] added P3/P4 rumble sliders (layoutGroup={hasLayout}).");
 
             // Insert into the tab's nav item array right after P2.
             if (ItemsF.GetValue(tab) is OptionsMenuitemBase[] arr)
@@ -102,6 +146,17 @@ namespace PunkFourPlayer
                 ItemsF.SetValue(tab, items.ToArray());
             }
             return (p3, p4);
+        }
+
+        // "<color=#RRGGBB>P3</color>   GAMEPAD RUMBLE" — same wording/spacing as the vanilla P1/P2 rows,
+        // colored with the shared per-player palette (falls back to white if the index is out of range).
+        private static string RumbleLabel(int player)
+        {
+            var colors = ExtraHuds.PlayerColors;
+            string hex = (colors != null && player >= 0 && player < colors.Length)
+                ? ColorUtility.ToHtmlStringRGB(colors[player])
+                : "FFFFFF";
+            return $"<color=#{hex}>P{player + 1}</color>   GAMEPAD RUMBLE";
         }
 
         private static OptionsMenuItemSlider Clone(OptionsMenuItemSlider src, string label, float value, Action<float> onChanged)

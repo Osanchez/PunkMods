@@ -36,6 +36,13 @@ namespace PunkSeedPicker
         private int _focus;
         private static readonly Color FocusBorder = new Color(1f, 0.78f, 0.32f, 1f);
 
+        // Screens behind us whose input we suppress while open (so the same stick/keys don't also
+        // navigate the loadout picker underneath), plus the scene EventSystem's saved nav state.
+        private readonly System.Collections.Generic.List<MonoBehaviour> _suppressed
+            = new System.Collections.Generic.List<MonoBehaviour>();
+        private UnityEngine.EventSystems.EventSystem _es;
+        private bool _prevNav;
+
         private static readonly FieldInfoCache LoadoutSelectedF =
             new FieldInfoCache(typeof(RunSetupScreen), "loadoutSelected");
 
@@ -94,7 +101,40 @@ namespace PunkSeedPicker
             MakeButton(panel.transform, font, "RANDOM", new Vector2(   0f, -190f), size, Randomize, BtnFill, BtnBorder, Color.white);
             MakeButton(panel.transform, font, "BACK",   new Vector2( 302f, -190f), size, Cancel,    BtnFill, BtnBorder, Color.white);
             _focus = 0; UpdateHighlight();
+
+            SuppressBehind();
         }
+
+        // While the seed overlay is up, stop the run-setup / loadout picker underneath from consuming
+        // the same input, and disable EventSystem navigation (keyboard/gamepad move+submit) so it
+        // can't drive selectables behind us. Mouse pointer input is untouched, and our own screen
+        // polls devices directly, so both keep working. Everything is restored in OnDestroy.
+        private void SuppressBehind()
+        {
+            foreach (var mb in UnityEngine.Object.FindObjectsOfType<MonoBehaviour>())
+            {
+                if (mb == this) continue;
+                switch (mb.GetType().Name)
+                {
+                    case "RunSetupScreen":
+                    case "LoadoutSelector":
+                    case "InputSelectorScreen":
+                        if (mb.enabled) { mb.enabled = false; _suppressed.Add(mb); }
+                        break;
+                }
+            }
+            _es = UnityEngine.EventSystems.EventSystem.current;
+            if (_es != null) { _prevNav = _es.sendNavigationEvents; _es.sendNavigationEvents = false; }
+        }
+
+        private void RestoreBehind()
+        {
+            foreach (var mb in _suppressed) if (mb != null) mb.enabled = true;
+            _suppressed.Clear();
+            if (_es != null) { _es.sendNavigationEvents = _prevNav; _es = null; }
+        }
+
+        private void OnDestroy() => RestoreBehind();
 
         // D-pad/stick or arrow keys move focus; South/Enter = confirm focused; Start = START;
         // East = BACK; North = RANDOM. (Typing a custom seed is still keyboard-only.)

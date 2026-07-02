@@ -53,6 +53,24 @@ jobs:
           $tag = "v{0}.{1}" -f (Get-Date -Format 'yyyy.MM.dd'), '${{ github.run_number }}'
           "tag=$tag" | Out-File -FilePath $env:GITHUB_OUTPUT -Append
 
+      # Read the game version/build id captured by tools/get-game-version.ps1 (committed as
+      # game-version.json, since the runner has no real game install) into a one-line release blurb.
+      - name: Compose game-version blurb
+        id: blurb
+        shell: pwsh
+        run: |
+          $blurb = ''
+          if (Test-Path 'game-version.json') {
+            $v = Get-Content 'game-version.json' -Raw | ConvertFrom-Json
+            $name = if ($v.gameName) { $v.gameName } else { 'PUNK Playtest' }
+            $ver  = if ($v.version)      { "game version $($v.version)" } else { $null }
+            $bld  = if ($v.steamBuildId) { "Steam build $($v.steamBuildId)" } else { $null }
+            if     ($ver -and $bld) { $blurb = "Built for **$name** $ver ($bld)." }
+            elseif ($ver)           { $blurb = "Built for **$name** $ver." }
+            elseif ($bld)           { $blurb = "Built for **$name** $bld." }
+          }
+          "blurb=$blurb" | Out-File -FilePath $env:GITHUB_OUTPUT -Append
+
       - name: Publish Release
         uses: softprops/action-gh-release@v2
         with:
@@ -60,3 +78,5 @@ jobs:
           name: PUNK Mods ${{ steps.ver.outputs.tag }}
           files: dist/*.zip
           generate_release_notes: true
+          append_body: true       # keep the auto-generated notes; add our blurb after them
+          body: ${{ steps.blurb.outputs.blurb }}

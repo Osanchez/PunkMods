@@ -53,10 +53,18 @@ This rebuilds `punk-refs.zip` from your current install and re-uploads it to the
 `PunkMods-refs` (falls back to `wsl gh` if `gh` isn't on Windows PATH). The next push to `main`
 builds against the refreshed DLLs. Run it too whenever you add a new `<Reference>` to a mod.
 
+It also refreshes **`game-version.json`** (via `tools/get-game-version.ps1`) with the installed
+game's Unity version + Steam build id. **Commit that file** — CI reads it to stamp each Release
+description with a "Built for PUNK Playtest ..." blurb (the runner has no real game install, so the
+version must be captured here). To refresh it on its own: `powershell -File tools\get-game-version.ps1`.
+
 ## How it fits together
 
 - `build-package.ps1` — no args: single all-in-one bundle (handy for local use). `-PerMod`: one zip
   per mod + `BepInEx-Setup.zip` (what CI uses). `-GameDir` overrides the build/reference root;
   `-Ci` skips refreshing your local `BepInEx\plugins`.
 - `tools/make-refs.ps1` — builds `punk-refs.zip` from your install (parses each `.csproj`).
-- `tools/update-refs.ps1` — make-refs + upload to the private refs release, in one command.
+- `tools/get-game-version.ps1` — reads the installed game's Unity version (from
+  `Punk_Data\globalgamemanagers`) + Steam build id (from the Steam `appmanifest`) into the tracked
+  `game-version.json`, which CI turns into the Release-description blurb.
+- `tools/update-refs.ps1` — make-refs + get-game-version + upload to the private refs release.

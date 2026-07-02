@@ -20,6 +20,11 @@ $ModsDir = Split-Path $Tools -Parent
 $zip = Join-Path $ModsDir 'punk-refs.zip'
 if (-not (Test-Path $zip)) { throw "punk-refs.zip was not produced by make-refs.ps1" }
 
+# 1b) Capture the current game version + Steam build id into Mods\game-version.json. CI can't read
+# the game (it only has the ref stub), so this tracked file is how the version reaches the Release
+# description. Commit the refreshed game-version.json along with any other changes.
+& (Join-Path $Tools 'get-game-version.ps1') -GameDir $GameDir
+
 # 2) Upload, replacing the existing asset. Prefer native gh; fall back to gh inside WSL.
 Write-Host "`nUploading punk-refs.zip to $RefsRepo (refs release)..." -ForegroundColor Cyan
 if (Get-Command gh -ErrorAction SilentlyContinue) {
