@@ -23,6 +23,10 @@ namespace PunkMetaLoadout
         {
             public List<string> profiles = new List<string>();
             public string[] slots = new string[4];   // index 0..3 = P1..P4 -> profile name or null
+            // What persists across runs: 0 = Ship + Vault (default), 1 = Ship only, 2 = Vault only.
+            // 0 is the default so an older profiles.json (no keepMode key) reads back as Ship + Vault,
+            // preserving the original behavior for existing users.
+            public int keepMode = 0;
         }
 
         private static Persist _data = new Persist();
@@ -129,6 +133,32 @@ namespace PunkMetaLoadout
             SaveMeta();
         }
 
+        /// <summary>Reset one profile's saved builds (deletes profiles/&lt;name&gt;/*.json) while keeping
+        /// the profile itself and its slot assignment. The shared per-class vault is NOT touched — it
+        /// belongs to every profile, so a single-profile reset must not wipe it.</summary>
+        internal static void ClearProfile(string name)
+        {
+            EnsureLoaded();
+            if (string.IsNullOrEmpty(name) || !_data.profiles.Contains(name)) return;
+            try
+            {
+                var d = ProfileDir(name);
+                if (Directory.Exists(d))
+                    foreach (var f in Directory.GetFiles(d, "*.json")) File.Delete(f);
+                Plugin.Log?.LogInfo($"Reset saved builds for profile '{name}'.");
+            }
+            catch (Exception e) { Plugin.Log?.LogWarning($"clear profile failed: {e.Message}"); }
+        }
+
+        // ---- keep-across-runs mode (global): 0 = Ship + Vault, 1 = Ship only, 2 = Vault only ----
+        internal static int GetKeepMode() { EnsureLoaded(); return Mathf.Clamp(_data.keepMode, 0, 2); }
+        internal static void SetKeepMode(int v)
+        {
+            EnsureLoaded();
+            v = Mathf.Clamp(v, 0, 2);
+            if (_data.keepMode != v) { _data.keepMode = v; SaveMeta(); }
+        }
+
         // ---- per-profile build + shared per-class vault file paths ----
         internal static string GridFile(string profile, string cls)
             => Path.Combine(ProfilesDir, profile, $"{cls}.json");
@@ -176,5 +206,11 @@ namespace PunkMetaLoadout
         public static string Create(string name) => ProfileStore.CreateProfile(name);
         public static void Rename(string oldName, string newName) => ProfileStore.Rename(oldName, newName);
         public static void Delete(string name) => ProfileStore.DeleteProfile(name);
+
+        // ---- join-screen profile picker (owned by this mod) — polled by PunkFourPlayer via reflection ----
+        /// <summary>True while the ready-up profile picker overlay is open (freezes the join flow).</summary>
+        public static bool IsPickerOpen => ProfileOverlay.IsOpen;
+        /// <summary>Increments whenever the picker closes; observers poll it to refresh slot displays.</summary>
+        public static int ChangeCounter => ProfileOverlay.ChangeCounter;
     }
 }

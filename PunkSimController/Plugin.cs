@@ -90,7 +90,13 @@ namespace PunkSimController
             _selected = -1;
         }
 
-        private void OnDestroy() => RemoveAllSims();
+        // Hot-reload teardown: Harmony-free mod, so nothing to unpatch. Remove every virtual gamepad we
+        // added to the Input System (so reloads don't leave orphaned sim pads) and drop the Mods-menu row.
+        private void OnDestroy()
+        {
+            RemoveAllSims();
+            try { ModMenuBridge.RemoveAll(); } catch { }
+        }
 
         private void Update()
         {

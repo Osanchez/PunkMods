@@ -51,6 +51,7 @@ Local & Remote Play co‑op uses **controllers**: one keyboard/mouse player plus
 - **Damage Slow-Mo** — Toggles the brief slow-motion the game plays when a player takes damage.
 - **Dash I-Frames** — Short invincibility window while dashing.
 - **Revive Item** — Adds the Revive Beacon, a shop consumable that revives a random downed player.
+- **Sell Vault Items** — Hover a spare module in the Vault and press the north face button (Y / Triangle, or a keyboard key) to sell it for its base shop buy price, credited to your run currency.
 - **Input Tweaks** — Raises the Input System polling rate to cut gamepad input latency.
 
 ## Building
@@ -66,6 +67,42 @@ powershell -ExecutionPolicy Bypass -File build-package.ps1 -PerMod
 ```
 
 The script auto-discovers every `*.csproj`, builds it, copies each mod's DLL (+ `mod.yaml`) into `BepInEx/plugins/<Mod>/`, and zips the result into `dist/`.
+
+### Development (debugging & hot-reload)
+
+These are **local-only** workflows. Distribution is always a Release build and **never** ships `.pdb` symbols; the dev flags below only touch your own install and skip packaging.
+
+PUNK runs on **Mono** (not IL2CPP), so managed debugging works.
+
+#### Step-through debugging
+
+1. Build with symbols and deploy them to your local install:
+   ```
+   powershell -File build-package.ps1 -Debug
+   ```
+   This does a Debug (unoptimized) build and copies each mod's `.dll` **and** `.pdb` into `BepInEx/plugins/<Mod>/`. (Run it again without `-Debug` to go back to optimized Release DLLs.)
+2. Enable the player's managed debugger — add these two lines to **`Punk_Data/boot.config`** (a game file, so it's local-only and not distributed):
+   ```
+   player-connection-debug=1
+   wait-for-managed-debugger=0
+   ```
+3. Launch the game, then attach a debugger and set breakpoints in the mod source:
+   - **[dnSpyEx](https://github.com/dnSpyEx/dnSpy)** — *Debug → Attach to Process → Unity*, pick `Punk.exe`. It uses the deployed `.pdb` for your mods and decompiles the game itself so you can step into `Punk.Main` too.
+   - **JetBrains Rider / Visual Studio** — *Attach to Unity Process* (needs the `.pdb`).
+
+#### Live hot-reload
+
+Rebuild a single mod and reload it in-game without restarting, via the in-repo **PunkDevReload** plugin (no external tools). It's built and deployed to your local install by any normal `build-package.ps1` run, and is **excluded from distribution**. It watches `BepInEx/scripts/`.
+
+1. Stage the mod you're iterating on into `scripts/`:
+   ```
+   powershell -File build-package.ps1 -HotReload PunkFourPlayer
+   ```
+   This Debug-builds just that mod into `BepInEx/scripts/` and removes it from `plugins/` (so it isn't loaded twice).
+2. In-game, press the reload key (default **F10**, configurable in `BepInEx/config/com.osanchez.punk.devreload.cfg`) after each rebuild. PunkDevReload destroys the old instance — running its `OnDestroy` teardown — then loads the new build from bytes; a matching `.pdb` is loaded too, so breakpoints still hit.
+3. When done, restore the mod to a normal plugin by re-running the build without `-HotReload` (Release build) or with `-Debug`.
+
+> **Reload cleanliness:** every mod unpatches its Harmony hooks and tears down its runtime objects in `OnDestroy`, so PunkDevReload can reload it without stacking duplicate patches or leaking UI. Keep that pattern (store the `Harmony` instance in `Awake`, undo everything in `OnDestroy`) when adding new mods. Note Mono can't truly unload assemblies, so many reloads in one session will slowly grow memory — restart occasionally.
 
 ### Releases
 

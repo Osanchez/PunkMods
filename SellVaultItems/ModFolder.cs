@@ -1,8 +1,10 @@
 using System.IO;
 using System.Reflection;
 
-namespace PunkDebugKey
+namespace SellVaultItems
 {
+    /// <summary>This DLL's own folder (e.g. BepInEx/plugins/SellVaultItems/) — the home for its
+    /// config and any future assets.</summary>
     internal static class ModFolder
     {
         internal static string Dir

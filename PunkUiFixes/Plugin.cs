@@ -26,12 +26,20 @@ namespace PunkUiFixes
         public const string Version = "1.0.0";
 
         internal static ManualLogSource Log;
+        private Harmony _harmony;
 
         private void Awake()
         {
             Log = Logger;
-            new Harmony(Guid).PatchAll(typeof(Plugin).Assembly);
+            _harmony = new Harmony(Guid);
+            _harmony.PatchAll(typeof(Plugin).Assembly);
             Log.LogInfo($"{Name} v{Version} loaded.");
+        }
+
+        // Hot-reload teardown: remove the UI-alignment patch so a reload doesn't double-hook it.
+        private void OnDestroy()
+        {
+            try { _harmony?.UnpatchSelf(); } catch { }
         }
     }
 

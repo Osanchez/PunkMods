@@ -1,0 +1,5 @@
+# Metadata for the MODS menu section header: "<name> By <author> (v<version>)".
+name: Sell Vault Items
+author: Trihardest
+version: 1.0.0
+description: Hover a spare module in the Vault and press the north face button (Y / Triangle) to sell it back for its base shop buy price, credited to your run currency.

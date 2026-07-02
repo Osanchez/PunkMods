@@ -148,9 +148,9 @@ namespace PunkFourPlayer
         private static readonly FieldInfo AssignedF = AccessTools.Field(typeof(InputSelectorScreen), "assigned");
         private static readonly FieldInfo DevicesAssignedF = AccessTools.Field(typeof(InputSelectorScreen), "DevicesAssigned");
 
-        // Per-row "was ready last frame", to detect the unready -> ready transition that opens the
-        // profile picker overlay. Cleared when the screen re-opens.
-        internal static readonly Dictionary<InputSelectorDeviceRow, bool> ReadyPrev = new Dictionary<InputSelectorDeviceRow, bool>();
+        // Last-seen value of MetaLoadout's picker change counter, to refresh the header profile tags
+        // only when a pick actually changes (cheap poll — no callback from MetaLoadout).
+        private static int _lastProfileChange;
 
         private static bool Prefix(InputSelectorScreen __instance)
         {
@@ -166,19 +166,15 @@ namespace PunkFourPlayer
                 var rows = (RowsF.GetValue(__instance) as IEnumerable)?.Cast<InputSelectorDeviceRow>().ToList();
                 if (rows == null) return false;
 
-                // Open the (blocking) profile picker when a slotted controller readies up.
+                // The profile picker itself (opening it on ready-up, and freezing the row while it's up)
+                // is owned by PunkMetaLoadout now. We only observe it: refresh the per-column profile
+                // tags when a pick changed, and freeze OUR start/movement logic while the picker is open.
                 if (ProfileBridge.Available)
                 {
-                    foreach (var r in rows)
-                    {
-                        bool isReady = r.IsReady && r.Position != 0;
-                        bool was = ReadyPrev.TryGetValue(r, out var w) && w;
-                        if (isReady && !was && !ProfileOverlay.IsOpen)
-                            ProfileOverlay.Open(__instance, JoinLayout.PosToPlayerIndex(r.Position), r.Device);
-                        ReadyPrev[r] = isReady;
-                    }
+                    int cc = ProfileBridge.ChangeCounter;
+                    if (cc != _lastProfileChange) { _lastProfileChange = cc; JoinHeader.UpdateProfileLabels(__instance); }
                 }
-                if (ProfileOverlay.IsOpen) return false;   // freeze start/movement while picking
+                if (ProfileBridge.IsPickerOpen) return false;   // MetaLoadout's picker is open — freeze start/movement
 
                 var gamepads = rows.Where(r => r.Device is Gamepad).ToList();
                 var slotted = rows.Where(r => r.Position != 0).ToList();
@@ -296,7 +292,7 @@ namespace PunkFourPlayer
 
         private static readonly MethodInfo AddDeviceM = AccessTools.Method(typeof(InputSelectorScreen), "AddDevice");
 
-        internal static void Reset() { Pending.Clear(); InputSelectorStart.ReadyPrev.Clear(); }
+        internal static void Reset() { Pending.Clear(); }
 
         // Emulated controllers from PunkSimController are named "PunkSim..."; treat them as dev tools.
         internal static bool IsSim(InputDevice device)

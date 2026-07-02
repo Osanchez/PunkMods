@@ -13,5 +13,12 @@ namespace PunkScoreboard
             try { T?.GetMethod("AddToggle")?.Invoke(null, new object[] { label, get, set }); }
             catch { }
         }
+
+        // Hot-reload teardown: drop the rows this mod registered so a reload doesn't stack duplicates.
+        public static void RemoveAll()
+        {
+            try { T?.GetMethod("RemoveByCaller")?.Invoke(null, null); }
+            catch { }
+        }
     }
 }

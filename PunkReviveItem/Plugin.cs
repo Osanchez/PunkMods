@@ -79,12 +79,22 @@ namespace PunkReviveItem
 
         internal static ManualLogSource Log;
         private static ReviveConsumable _consumable;
+        private Harmony _harmony;
 
         private void Awake()
         {
             Log = Logger;
-            new Harmony(Guid).PatchAll(typeof(Plugin).Assembly);
+            _harmony = new Harmony(Guid);
+            _harmony.PatchAll(typeof(Plugin).Assembly);
             Log.LogInfo($"{Name} v{Version} loaded. Revive Beacon ({Cost}) will appear in the shop.");
+        }
+
+        // Hot-reload teardown: remove the shop-injection patches. The consumable already registered in
+        // the game's ConsumableRegistry stays (it's keyed by id and only added once — harmless to leave;
+        // the next run's RunData.Initialize won't re-add a duplicate because of the id guard).
+        private void OnDestroy()
+        {
+            try { _harmony?.UnpatchSelf(); } catch { }
         }
 
         internal static ReviveConsumable Consumable()

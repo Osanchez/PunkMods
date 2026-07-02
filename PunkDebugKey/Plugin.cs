@@ -28,6 +28,7 @@ namespace PunkDebugKey
 
         internal static ManualLogSource Log;
         internal static BepInEx.Configuration.ConfigEntry<bool> Enabled;
+        private Harmony _harmony;
 
         private void Awake()
         {
@@ -40,11 +41,19 @@ namespace PunkDebugKey
             Enabled = cfg.Bind("General", "Enabled", !ModMenuBridge.Available,
                 "Enable the F1 developer debug menu. Defaults ON, or OFF when the Mods menu is installed.");
 
-            new Harmony(Guid).PatchAll(typeof(DebugMenuPatch));
+            _harmony = new Harmony(Guid);
+            _harmony.PatchAll(typeof(DebugMenuPatch));
             ModMenuBridge.AddToggle("Debug Menu (F1)", () => Enabled.Value, v => Enabled.Value = v);
 
             Log.LogInfo($"{Name} v{Version} loaded. F1 debug menu {(Enabled.Value ? "ON" : "OFF")}." +
                         (ModMenuBridge.Available ? " Toggle it in the Mods menu." : ""));
+        }
+
+        // Hot-reload teardown: undo the DebugMenu.Update postfix and the Mods-menu row.
+        private void OnDestroy()
+        {
+            try { _harmony?.UnpatchSelf(); } catch { }
+            try { ModMenuBridge.RemoveAll(); } catch { }
         }
     }
 

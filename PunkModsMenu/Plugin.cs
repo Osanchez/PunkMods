@@ -31,6 +31,7 @@ namespace PunkModsMenu
         public sealed class Entry
         {
             public Kind kind;
+            public Assembly owner;        // the mod assembly that registered this row (for teardown on hot-reload)
             public string label;
             public string section;        // grouping key: the mod's (prettified) name
             public string sectionLabel;   // display: "NAME By Author (vVersion)"
@@ -54,22 +55,32 @@ namespace PunkModsMenu
 
         /// <summary>A row with an OFF/ON selector that applies immediately.</summary>
         public static void AddToggle(string label, Func<bool> get, Action<bool> set)
-        { var s = DeriveSection(); Entries.Add(new Entry { kind = Kind.Toggle, label = label, get = get, set = set, section = s?.Key, sectionLabel = s?.Label, sectionDescription = s?.Description }); }
+        { var a = CallerAssembly(); var s = a != null ? InfoFor(a) : null; Entries.Add(new Entry { kind = Kind.Toggle, owner = a, label = label, get = get, set = set, section = s?.Key, sectionLabel = s?.Label, sectionDescription = s?.Description }); }
 
         /// <summary>A row with a neutral option and an action option; the action fires (optionally
         /// with a confirm prompt) when you exit the Settings screen with the action option selected.</summary>
         public static void AddButton(string label, string neutralLabel, string actionLabel, Action action, bool confirm, string confirmText)
-        { var s = DeriveSection(); Entries.Add(new Entry { kind = Kind.ConfirmButton, label = label, neutralLabel = neutralLabel, actionLabel = actionLabel, action = action, confirm = confirm, confirmText = confirmText, section = s?.Key, sectionLabel = s?.Label, sectionDescription = s?.Description }); }
+        { var a = CallerAssembly(); var s = a != null ? InfoFor(a) : null; Entries.Add(new Entry { kind = Kind.ConfirmButton, owner = a, label = label, neutralLabel = neutralLabel, actionLabel = actionLabel, action = action, confirm = confirm, confirmText = confirmText, section = s?.Key, sectionLabel = s?.Label, sectionDescription = s?.Description }); }
 
         /// <summary>A row whose action fires IMMEDIATELY when its action option is selected (then
         /// refreshes list rows). Use for create/delete that should update the UI live.</summary>
         public static void AddAction(string label, string actionLabel, Action action)
-        { var s = DeriveSection(); Entries.Add(new Entry { kind = Kind.Action, label = label, neutralLabel = "—", actionLabel = actionLabel, action = action, section = s?.Key, sectionLabel = s?.Label, sectionDescription = s?.Description }); }
+        { var a = CallerAssembly(); var s = a != null ? InfoFor(a) : null; Entries.Add(new Entry { kind = Kind.Action, owner = a, label = label, neutralLabel = "—", actionLabel = actionLabel, action = action, section = s?.Key, sectionLabel = s?.Label, sectionDescription = s?.Description }); }
 
         /// <summary>A flippable selector row (◄ value ►). <paramref name="options"/> is read live each
         /// time it flips/refreshes, so dynamic lists (e.g. profiles) stay current.</summary>
         public static void AddList(string label, Func<List<string>> options, Func<int> getIndex, Action<int> setIndex)
-        { var s = DeriveSection(); Entries.Add(new Entry { kind = Kind.List, label = label, options = options, getIndex = getIndex, setIndex = setIndex, section = s?.Key, sectionLabel = s?.Label, sectionDescription = s?.Description }); }
+        { var a = CallerAssembly(); var s = a != null ? InfoFor(a) : null; Entries.Add(new Entry { kind = Kind.List, owner = a, label = label, options = options, getIndex = getIndex, setIndex = setIndex, section = s?.Key, sectionLabel = s?.Label, sectionDescription = s?.Description }); }
+
+        /// <summary>Teardown hook for hot-reload: a mod calls this from its plugin's OnDestroy (via its
+        /// reflection bridge) to drop the rows it registered, so a live reload doesn't stack duplicates.
+        /// Uses the same call-stack derivation as registration to identify the caller's assembly.</summary>
+        public static void RemoveByCaller()
+        {
+            var a = CallerAssembly();
+            if (a == null) return;
+            Entries.RemoveAll(e => e.owner == a);
+        }
 
         // ---- section (source mod) derivation ----
 
@@ -79,7 +90,7 @@ namespace PunkModsMenu
         // Walk the call stack to the first frame outside this framework (and outside system/Unity/
         // BepInEx/Harmony) — that's the mod that registered the row. The mod calls us through its own
         // reflection bridge, so its assembly is on the stack even though the call is reflective.
-        private static SectionInfo DeriveSection()
+        private static Assembly CallerAssembly()
         {
             try
             {
@@ -93,7 +104,7 @@ namespace PunkModsMenu
                     if (n.StartsWith("System") || n.StartsWith("mscorlib") || n.StartsWith("netstandard")
                         || n.StartsWith("Mono") || n == "0Harmony" || n.StartsWith("Unity") || n.StartsWith("BepInEx"))
                         continue;
-                    return InfoFor(asm);
+                    return asm;
                 }
             }
             catch { }
@@ -234,12 +245,23 @@ namespace PunkModsMenu
         public const string Version = "2.1.0";
 
         internal static ManualLogSource Log;
+        private Harmony _harmony;
 
         private void Awake()
         {
             Log = Logger;
-            new Harmony(Guid).PatchAll(typeof(Plugin).Assembly);
+            _harmony = new Harmony(Guid);
+            _harmony.PatchAll(typeof(Plugin).Assembly);
             Log.LogInfo($"{Name} v{Version} loaded.");
+        }
+
+        // Hot-reload teardown: drop this framework's Harmony patches (tab injection / nav / close guard).
+        // We deliberately do NOT clear ModMenu.Entries: it's a SHARED registry that other, still-loaded
+        // mods have registered rows into, and each mod removes its own rows from its own OnDestroy
+        // (ModMenu.RemoveByCaller). Wiping it here would erase rows for mods that aren't reloading.
+        private void OnDestroy()
+        {
+            try { _harmony?.UnpatchSelf(); } catch (Exception e) { Log?.LogWarning($"unpatch failed: {e.Message}"); }
         }
     }
 

@@ -1,47 +1,33 @@
 using System;
 using System.Collections.Generic;
 using System.Linq;
-using HarmonyLib;
 using TMPro;
 using UnityEngine;
 using UnityEngine.InputSystem;
 using UnityEngine.InputSystem.Controls;
 using UnityEngine.UI;
 
-namespace PunkFourPlayer
+namespace PunkMetaLoadout
 {
-    /// <summary>Soft (reflection) bridge into PunkMetaLoadout's profile store — no hard dependency.</summary>
-    internal static class ProfileBridge
-    {
-        private static readonly Type T = Type.GetType("PunkMetaLoadout.ProfileApi, PunkMetaLoadout");
-        internal static bool Available => T != null;
-
-        internal static List<string> List()
-        {
-            try { return (T?.GetMethod("List")?.Invoke(null, null) as IEnumerable<string>)?.ToList() ?? new List<string>(); }
-            catch { return new List<string>(); }
-        }
-        internal static string GetSlot(int slot)
-        { try { return T?.GetMethod("GetSlot")?.Invoke(null, new object[] { slot }) as string; } catch { return null; } }
-        internal static void SetSlot(int slot, string profile)
-        { try { T?.GetMethod("SetSlot")?.Invoke(null, new object[] { slot, profile }); } catch { } }
-        internal static void ClearSlots()
-        { try { T?.GetMethod("ClearSlots")?.Invoke(null, null); } catch { } }
-        internal static string Create(string name)
-        { try { return T?.GetMethod("Create")?.Invoke(null, new object[] { name }) as string; } catch { return null; } }
-        internal static void Rename(string oldName, string newName)
-        { try { T?.GetMethod("Rename")?.Invoke(null, new object[] { oldName, newName }); } catch { } }
-    }
-
     /// <summary>
-    /// Blocking overlay shown when a player readies up: pick an existing profile, create a new one,
-    /// or rename one. The list scrolls (windowed) when there are many profiles. Naming uses an
-    /// on-screen keyboard (navigable by controller, clickable by mouse) plus the physical keyboard.
-    /// On select the profile is assigned to that player's slot and the overlay closes.
+    /// Blocking overlay shown when a player readies up on the join screen: pick an existing profile,
+    /// create a new one, or rename one. The list scrolls (windowed) when there are many profiles.
+    /// Naming uses an on-screen keyboard (navigable by controller, clickable by mouse) plus the
+    /// physical keyboard. On select the profile is assigned to that player's slot and the overlay
+    /// closes.
+    ///
+    /// This now lives in PunkMetaLoadout (which owns the profile concept/data), so it calls
+    /// <see cref="ProfileApi"/> / <see cref="ProfileStore"/> directly instead of via reflection.
+    /// PunkFourPlayer (if installed) observes <see cref="ChangeCounter"/> to refresh its header tags;
+    /// this overlay never calls into PunkFourPlayer.
     /// </summary>
     public class ProfileOverlay : MonoBehaviour
     {
         internal static bool IsOpen;
+
+        // Bumped every time the picker closes (i.e. a slot assignment may have changed). PunkFourPlayer
+        // polls this to know when to refresh its per-column profile tags — no callback into FourPlayer.
+        internal static int ChangeCounter;
 
         private const string NoProfile = "No Profile";
         private const string CreateNew = "Create New";
@@ -58,11 +44,12 @@ namespace PunkFourPlayer
         private static readonly Color Muted       = new Color(0.62f, 0.62f, 0.66f, 1f);
 
         private GameObject _canvas;
-        private InputSelectorScreen _screen;
+        private InputSelectorScreen _screen;   // may be null in the single-player case (no join screen)
         private int _player;
         private InputDevice _device;
         private bool _isSim;
         private TMP_FontAsset _font;
+        private Action _onClose;               // invoked once after the overlay closes (single-player start)
 
         private enum Mode { List, Name }
         private Mode _mode = Mode.List;
@@ -86,7 +73,9 @@ namespace PunkFourPlayer
 
         private TMP_Text _title, _hint;
 
-        internal static void Open(InputSelectorScreen screen, int player, InputDevice device)
+        // screen may be null (single-player has no join screen). onClose runs once after the overlay
+        // closes — the single-player start uses it to proceed into the run only after a pick is made.
+        internal static void Open(InputSelectorScreen screen, int player, InputDevice device, Action onClose = null)
         {
             if (IsOpen) return;
             IsOpen = true;
@@ -96,8 +85,8 @@ namespace PunkFourPlayer
             c.sortingOrder = 31000;
             go.AddComponent<GraphicRaycaster>();
             var o = go.AddComponent<ProfileOverlay>();
-            o._canvas = go; o._screen = screen; o._player = player; o._device = device;
-            o._isSim = JoinGate.IsSim(device);
+            o._canvas = go; o._screen = screen; o._player = player; o._device = device; o._onClose = onClose;
+            o._isSim = JoinProfileTrigger.IsSim(device);
             o.Build();
         }
 
@@ -148,11 +137,11 @@ namespace PunkFourPlayer
         private void RebuildOptions(bool selectCurrent)
         {
             _options = new List<string> { NoProfile, CreateNew };
-            _options.AddRange(ProfileBridge.List());
+            _options.AddRange(ProfileApi.List());
 
             if (selectCurrent)
             {
-                var cur = ProfileBridge.GetSlot(_player);
+                var cur = ProfileApi.GetSlot(_player);
                 _sel = string.IsNullOrEmpty(cur) ? 0 : Mathf.Max(0, _options.IndexOf(cur));
             }
             _sel = Mathf.Clamp(_sel, 0, _options.Count - 1);
@@ -227,9 +216,9 @@ namespace PunkFourPlayer
             if (ok)
             {
                 string opt = _options[_sel];
-                if (opt == NoProfile) { ProfileBridge.SetSlot(_player, null); Close(); }
+                if (opt == NoProfile) { ProfileApi.SetSlot(_player, null); Close(); }
                 else if (opt == CreateNew) { _renameTarget = null; _nameBuf = ""; EnterName(); }
-                else { ProfileBridge.SetSlot(_player, opt); Close(); }
+                else { ProfileApi.SetSlot(_player, opt); Close(); }
             }
         }
 
@@ -285,14 +274,14 @@ namespace PunkFourPlayer
         {
             if (_renameTarget != null)
             {
-                ProfileBridge.Rename(_renameTarget, _nameBuf);
+                ProfileApi.Rename(_renameTarget, _nameBuf);
                 _renameTarget = null; _mode = Mode.List;
                 RebuildOptions(selectCurrent: false); ShowMode();
             }
             else
             {
-                var created = ProfileBridge.Create(_nameBuf);   // empty -> auto "Profile N"
-                ProfileBridge.SetSlot(_player, created);
+                var created = ProfileApi.Create(_nameBuf);   // empty -> auto "Profile N"
+                ProfileApi.SetSlot(_player, created);
                 Close();
             }
         }
@@ -354,8 +343,30 @@ namespace PunkFourPlayer
         private void Close()
         {
             IsOpen = false;
-            try { JoinHeader.UpdateProfileLabels(_screen); } catch { }
+            ChangeCounter++;   // signal observers (e.g. PunkFourPlayer's header) that a slot may have changed
+            var cb = _onClose; _onClose = null;
             Destroy(_canvas);
+            // Single-player: resume the run start now that a profile (or "No Profile") is chosen. Guarded
+            // so a callback failure can't leave the overlay stuck — worst case the run just doesn't start.
+            if (cb != null)
+            {
+                try { cb(); }
+                catch (Exception e) { Plugin.Log?.LogWarning($"profile overlay close callback failed: {e.Message}"); }
+            }
+        }
+
+        // Hot-reload teardown: if the picker is open when the mod unloads, tear its canvas down so it
+        // doesn't linger as an orphaned overlay. Skips the ChangeCounter bump (no slot change happened).
+        internal static void ForceClose()
+        {
+            if (!IsOpen) return;
+            IsOpen = false;
+            try
+            {
+                var o = UnityEngine.Object.FindObjectOfType<ProfileOverlay>();
+                if (o != null) UnityEngine.Object.Destroy(o.gameObject);
+            }
+            catch { }
         }
 
         private static bool P(ButtonControl b) => b != null && b.wasPressedThisFrame;
@@ -405,20 +416,6 @@ namespace PunkFourPlayer
         {
             rt.anchorMin = rt.anchorMax = new Vector2(0.5f, 0.5f); rt.pivot = new Vector2(0.5f, 0.5f);
             rt.anchoredPosition = pos; rt.sizeDelta = size;
-        }
-    }
-
-    // Freeze the device rows while the profile overlay is up, and freeze the KEYBOARD's own row
-    // whenever emulated controllers are present — so the keyboard only puppets the selected sim
-    // (via PunkSimController) instead of also driving its own join row.
-    [HarmonyPatch(typeof(InputSelectorDeviceRow), "Update")]
-    internal static class FreezeRowsDuringOverlay
-    {
-        private static bool Prefix(InputSelectorDeviceRow __instance)
-        {
-            if (ProfileOverlay.IsOpen) return false;
-            if (__instance.Device is Keyboard && JoinGate.AnySim()) return false;
-            return true;
         }
     }
 }

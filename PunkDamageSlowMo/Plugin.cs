@@ -21,6 +21,7 @@ namespace PunkDamageSlowMo
         internal static ManualLogSource Log;
         // ON = slow-mo plays on damage (the game's default behavior). OFF = suppressed.
         internal static BepInEx.Configuration.ConfigEntry<bool> Enabled;
+        private Harmony _harmony;
 
         private void Awake()
         {
@@ -29,10 +30,18 @@ namespace PunkDamageSlowMo
             Enabled = cfg.Bind("General", "Enabled", true,
                 "Play the brief slow-motion when a player takes damage. ON = game default; OFF = full speed.");
 
-            new Harmony(Guid).PatchAll(typeof(Plugin).Assembly);
+            _harmony = new Harmony(Guid);
+            _harmony.PatchAll(typeof(Plugin).Assembly);
             ModMenuBridge.AddToggle("Slow-Mo on Damage", () => Enabled.Value, v => Enabled.Value = v);
 
             Log.LogInfo($"{Name} v{Version} loaded. Damage slow-mo {(Enabled.Value ? "ON" : "OFF")}.");
+        }
+
+        // Hot-reload teardown: undo the Harmony patch and the Mods-menu row.
+        private void OnDestroy()
+        {
+            try { _harmony?.UnpatchSelf(); } catch { }
+            try { ModMenuBridge.RemoveAll(); } catch { }
         }
     }
 

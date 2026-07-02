@@ -35,6 +35,7 @@ namespace PunkScoreboard
         private bool  _open;          // is the board currently shown?
         private bool  _slowed;        // have we applied the time-scale modifier?
         private float _lastPollUnscaled = -999f;
+        private Harmony _harmony;
 
         // Cached display snapshot, rebuilt on the poll cadence (not every frame).
         private struct RowS { public string name, kills, bosses, deaths, dmg, time, hp, fuel; }
@@ -64,7 +65,8 @@ namespace PunkScoreboard
             Enabled = cfg.Bind("General", "Enabled", true,
                 "Show the co-op scoreboard while Tab (or gamepad Select) is held.");
 
-            new Harmony(Guid).PatchAll(typeof(Plugin).Assembly);
+            _harmony = new Harmony(Guid);
+            _harmony.PatchAll(typeof(Plugin).Assembly);
             GameController.GameStarted += Scoreboard.Rebuild;
             ModMenuBridge.AddToggle("Scoreboard (hold Tab)", () => Enabled.Value, v => Enabled.Value = v);
 
@@ -113,6 +115,12 @@ namespace PunkScoreboard
         {
             // Be sure we never leave the game stuck in slow-mo.
             if (_slowed) { try { ServiceLocator.Get<TimeManager>()?.RemoveAllModifiers(this); } catch { } }
+            // Hot-reload teardown: undo the damage-attribution patches, stop listening for run starts,
+            // detach the per-Unit kill handlers, and drop the Mods-menu row.
+            try { _harmony?.UnpatchSelf(); } catch { }
+            try { GameController.GameStarted -= Scoreboard.Rebuild; } catch { }
+            try { Scoreboard.Teardown(); } catch { }
+            try { ModMenuBridge.RemoveAll(); } catch { }
         }
 
         private static bool HeldThisFrame()

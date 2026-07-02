@@ -3,6 +3,7 @@ using BepInEx;
 using BepInEx.Configuration;
 using BepInEx.Logging;
 using BepInEx.Unity.Mono;
+using UnityEngine.Events;
 using UnityEngine.InputSystem;
 using UnityEngine.SceneManagement;
 
@@ -28,6 +29,10 @@ namespace PunkInputTweaks
         internal static ManualLogSource Log;
         private static ConfigEntry<int> _pollingHz;
 
+        // Kept so OnDestroy can unsubscribe the handler and restore the original polling rate on reload.
+        private UnityAction<Scene, LoadSceneMode> _onSceneLoaded;
+        private float _previousHz = -1f;   // InputSystem.pollingFrequency is a float
+
         private void Awake()
         {
             Log = Logger;
@@ -37,9 +42,19 @@ namespace PunkInputTweaks
                                       "Higher = lower controller input latency. 125-250 is a good range.",
                                       new AcceptableValueRange<int>(60, 1000)));
 
+            _previousHz = InputSystem.pollingFrequency;   // capture so we can restore it on reload
             Apply();
             // Re-apply on scene loads in case anything resets it.
-            SceneManager.sceneLoaded += (_, __) => Apply();
+            _onSceneLoaded = (_, __) => Apply();
+            SceneManager.sceneLoaded += _onSceneLoaded;
+        }
+
+        // Hot-reload teardown: Harmony-free mod. Unsubscribe the scene-load handler (else a reload would
+        // stack a second one) and restore the polling frequency we changed.
+        private void OnDestroy()
+        {
+            try { if (_onSceneLoaded != null) SceneManager.sceneLoaded -= _onSceneLoaded; } catch { }
+            try { if (_previousHz > 0f) InputSystem.pollingFrequency = _previousHz; } catch { }
         }
 
         private void Apply()

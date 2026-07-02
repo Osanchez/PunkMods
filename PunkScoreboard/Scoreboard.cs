@@ -85,6 +85,14 @@ namespace PunkScoreboard
             _killHandlers.Clear();
         }
 
+        /// <summary>Hot-reload teardown: detach every kill handler and drop the cached roster so a
+        /// reload leaves no dangling subscriptions on game Units.</summary>
+        internal static void Teardown()
+        {
+            DetachKillHandlers();
+            Ships = new List<Ship>();
+        }
+
         private static void OnKill(int player, Unit killer, Unit killed)
         {
             try

@@ -25,11 +25,13 @@ namespace PunkMetaLoadout
         public const string Version = "2.0.0";
 
         internal static ManualLogSource Log;
+        private Harmony _harmony;
 
         private void Awake()
         {
             Log = Logger;
-            new Harmony(Guid).PatchAll(typeof(Plugin).Assembly);
+            _harmony = new Harmony(Guid);
+            _harmony.PatchAll(typeof(Plugin).Assembly);
 
             GameController.LevelGenerated += MetaLoadout.OnRunReady;
             GameController.GameOver       += MetaLoadout.OnGameOver;
@@ -41,6 +43,17 @@ namespace PunkMetaLoadout
             Log.LogInfo($"{Name} v{Version} loaded. Saves at: {MetaLoadout.Dir}" +
                         (ModMenuBridge.Available ? " | Mods-menu row registered." : " | no Mods menu — clear by deleting that folder."));
         }
+
+        // Hot-reload teardown: undo the Harmony patches (join-screen triggers, freeze, Vault.Store),
+        // drop the run/grid/vault event subscriptions, close the profile picker overlay if it's open,
+        // and remove the PROFILES rows from the Mods menu.
+        private void OnDestroy()
+        {
+            try { _harmony?.UnpatchSelf(); } catch { }
+            try { MetaLoadout.Teardown(); } catch { }
+            try { ProfileOverlay.ForceClose(); } catch { }
+            try { ModMenuBridge.RemoveAll(); } catch { }
+        }
     }
 
     internal static class MetaLoadout
@@ -50,6 +63,13 @@ namespace PunkMetaLoadout
         private static string _runClass = "default";
         private static bool _isContinue;
         internal static bool Suppressed;   // set by ClearProgress; cleared on next run
+
+        // "Keep Across Runs" gates BOTH save and restore per component, so the non-selected side's JSON
+        // is left untouched (frozen) instead of cleared — switch modes later and the old values are
+        // still there. Stored mode: 0 = Ship + Vault, 1 = Ship only, 2 = Vault only. Read live so a
+        // mid-session change in the Mods menu takes effect immediately.
+        private static bool KeepShip  { get { int m = ProfileStore.GetKeepMode(); return m == 0 || m == 1; } }
+        private static bool KeepVault { get { int m = ProfileStore.GetKeepMode(); return m == 0 || m == 2; } }
 
         private static readonly List<(ModuleGrid grid, Action<Module> handler)> _gridSubs = new List<(ModuleGrid, Action<Module>)>();
         private static Vault _vault;
@@ -66,6 +86,29 @@ namespace PunkMetaLoadout
             ProfileStore.ClearAll();
             Suppressed = true;
             Plugin.Log?.LogInfo("All profiles + loadouts cleared.");
+        }
+
+        /// <summary>Hot-reload teardown: drop the run/grid/vault event subscriptions this class made,
+        /// so a live reload leaves no dangling handlers on game objects. Idempotent and guarded.</summary>
+        internal static void Teardown()
+        {
+            try
+            {
+                GameController.LevelGenerated -= OnRunReady;
+                GameController.GameOver       -= OnGameOver;
+            }
+            catch { }
+            try
+            {
+                foreach (var (g, h) in _gridSubs) { if (g != null) { g.ModuleInstalled -= h; g.ModuleUninstalled -= h; } }
+                _gridSubs.Clear();
+            }
+            catch { }
+            try
+            {
+                if (_vault != null) { _vault.IngredientAmountChanged -= _ingH; _vault.ConsumableAmountChanged -= _conH; _vault = null; }
+            }
+            catch { }
         }
 
         // ---------- run wiring ----------
@@ -98,6 +141,7 @@ namespace PunkMetaLoadout
 
         private static void RestoreShip(Ship ship, int slot)   // slot is 1-based
         {
+            if (!KeepShip) return;                              // Vault-only mode -> ships start fresh
             var profile = ProfileStore.GetSlot(slot - 1);
             if (string.IsNullOrEmpty(profile)) return;          // No Profile -> fresh starting loadout
             if (!(ship?.ModuleGridOwner?.ModuleGrid is ModuleGrid grid)) return;
@@ -110,6 +154,7 @@ namespace PunkMetaLoadout
 
         private static void RestoreVault()
         {
+            if (!KeepVault) return;                             // Ship-only mode -> vault starts fresh
             var vault = ServiceLocator.Get<Vault>();
             if (vault == null || ReferenceEquals(vault, RestoredVault)) return;
             var mem = LoadVault(ProfileStore.VaultFile(_runClass));
@@ -146,7 +191,7 @@ namespace PunkMetaLoadout
 
         private static void SaveGrid(ModuleGrid grid, int slot)   // slot is 1-based
         {
-            if (Suppressed || grid == null) return;
+            if (Suppressed || grid == null || !KeepShip) return;   // Vault-only mode -> leave grid JSON frozen
             var profile = ProfileStore.GetSlot(slot - 1);
             if (string.IsNullOrEmpty(profile)) return;            // No Profile -> nothing persists
             try
@@ -160,7 +205,7 @@ namespace PunkMetaLoadout
 
         internal static void SaveVault()
         {
-            if (Suppressed) return;
+            if (Suppressed || !KeepVault) return;   // Ship-only mode -> leave vault JSON frozen
             try
             {
                 var vault = ServiceLocator.Get<Vault>();

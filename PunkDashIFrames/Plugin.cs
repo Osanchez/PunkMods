@@ -28,6 +28,7 @@ namespace PunkDashIFrames
         // Per-ship invincibility deadline (game time), keyed by the ship's damage resource.
         internal static readonly Dictionary<DamagableResource, float> IframeUntil = new Dictionary<DamagableResource, float>();
         private static readonly List<(ShipMovement move, Action handler)> _subs = new List<(ShipMovement, Action)>();
+        private Harmony _harmony;
 
         private void Awake()
         {
@@ -36,11 +37,28 @@ namespace PunkDashIFrames
             Enabled = cfg.Bind("General", "Enabled", true, "Grant invincibility while dashing.");
             Seconds = cfg.Bind("General", "Seconds", 0.5f, "How long the dash invincibility lasts, in seconds.");
 
-            new Harmony(Guid).PatchAll(typeof(Plugin).Assembly);
+            _harmony = new Harmony(Guid);
+            _harmony.PatchAll(typeof(Plugin).Assembly);
             GameController.GameStarted += Rebuild;
             ModMenuBridge.AddToggle("Dash Invincibility", () => Enabled.Value, v => Enabled.Value = v);
 
             Log.LogInfo($"{Name} v{Version} loaded. Enabled={Enabled.Value}, window={Seconds.Value}s.");
+        }
+
+        // Hot-reload teardown: undo the damage-block patch, stop listening for run starts, detach every
+        // per-ship DashStarted handler we added, and clear the tracking state and Mods-menu row.
+        private void OnDestroy()
+        {
+            try { _harmony?.UnpatchSelf(); } catch { }
+            try { GameController.GameStarted -= Rebuild; } catch { }
+            try
+            {
+                foreach (var (m, h) in _subs) { if (m != null) m.DashStarted -= h; }
+                _subs.Clear();
+                IframeUntil.Clear();
+            }
+            catch { }
+            try { ModMenuBridge.RemoveAll(); } catch { }
         }
 
         // (Re)subscribe to every ship's DashStarted at the start of each run.

@@ -22,6 +22,7 @@ namespace PunkSeedPicker
 
         internal static ManualLogSource Log;
         internal static ConfigEntry<bool> Enabled;
+        private Harmony _harmony;
 
         private void Awake()
         {
@@ -31,11 +32,21 @@ namespace PunkSeedPicker
             Enabled = cfg.Bind("General", "Enabled", true,
                 "Show the seed-entry screen after choosing a class on a new run.");
 
-            new Harmony(Guid).PatchAll(typeof(Plugin).Assembly);
+            _harmony = new Harmony(Guid);
+            _harmony.PatchAll(typeof(Plugin).Assembly);
 
             ModMenuBridge.AddToggle("Seed Picker", () => Enabled.Value, v => Enabled.Value = v);
 
             Log.LogInfo($"{Name} v{Version} loaded." + (ModMenuBridge.Available ? " | Mods-menu toggle registered." : ""));
+        }
+
+        // Hot-reload teardown: undo the StartGame/seed-screen patches and the Mods-menu row. The seed
+        // screen itself is transient (opened only during run setup, not tracked here), so nothing else
+        // to destroy.
+        private void OnDestroy()
+        {
+            try { _harmony?.UnpatchSelf(); } catch { }
+            try { ModMenuBridge.RemoveAll(); } catch { }
         }
     }
 

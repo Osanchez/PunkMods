@@ -201,8 +201,11 @@ namespace PunkPlayerHighlight
 
         private void OnDestroy()
         {
+            // Harmony-free mod: nothing to unpatch. Destroy the per-ship glow objects we created and
+            // drop the Mods-menu rows so a hot-reload starts clean.
             foreach (var kv in _glows) if (kv.Value?.root != null) Destroy(kv.Value.root);
             _glows.Clear();
+            try { ModMenuBridge.RemoveAll(); } catch { }
         }
 
         private static void EnsureAssets()

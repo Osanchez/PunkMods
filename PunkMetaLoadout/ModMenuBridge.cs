@@ -37,5 +37,12 @@ namespace PunkMetaLoadout
             try { T?.GetMethod("AddList")?.Invoke(null, new object[] { label, options, getIndex, setIndex }); }
             catch { }
         }
+
+        // Hot-reload teardown: drop the rows this mod registered so a reload doesn't stack duplicates.
+        public static void RemoveAll()
+        {
+            try { T?.GetMethod("RemoveByCaller")?.Invoke(null, null); }
+            catch { }
+        }
     }
 }

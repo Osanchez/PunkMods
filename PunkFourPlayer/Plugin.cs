@@ -34,6 +34,7 @@ namespace PunkFourPlayer
 
         internal static ManualLogSource Log;
         internal static ConfigEntry<int> PlayerCount;
+        private Harmony _harmony;
 
         private void Awake()
         {
@@ -43,8 +44,22 @@ namespace PunkFourPlayer
             PlayerCount = cfg.Bind("General", "PlayerCount", 4,
                 new ConfigDescription("Target local players in a NEW co-op run.", new AcceptableValueRange<int>(2, 4)));
             RumbleConfig.Init(cfg);   // P3/P4 gamepad rumble (also shown as sliders in Gameplay settings)
-            new Harmony(Guid).PatchAll(typeof(Plugin).Assembly);
+            _harmony = new Harmony(Guid);
+            _harmony.PatchAll(typeof(Plugin).Assembly);
             Log.LogInfo($"{Name} v{Version} loaded. Target co-op players: {Target}.");
+        }
+
+        // Hot-reload teardown: remove ALL of this mod's Harmony patches — the join-header rebuilds,
+        // extra-ship spawning, extra HUDs, rumble-per-player and the Gameplay rumble sliders. That's the
+        // key fix so a reload doesn't double-hook them. This mod registers no game-event handlers and no
+        // Mods-menu rows, so there's nothing else to unsubscribe. Note: UI it created via those patches
+        // (HUD clones, "PLAYER N" labels, profile tags, P3/P4 sliders) and its static state
+        // (SlotRegistry / FourPlayerRuntime / Stored.Loadout / cached themes) are transient game-screen
+        // children and process-lifetime statics respectively — they aren't tracked per-instance here and
+        // are rebuilt on the next screen open, which is acceptable for a dev hot-reload.
+        private void OnDestroy()
+        {
+            try { _harmony?.UnpatchSelf(); } catch { }
         }
 
         internal static int Target => Mathf.Clamp(PlayerCount?.Value ?? 4, 2, 4);
