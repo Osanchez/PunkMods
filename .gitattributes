@@ -1,0 +1,7 @@
+# Normalize line endings. Git stores text files with LF in the repo (matching the Linux CI
+# runners) and checks them out with each platform's native endings. This stops CRLF-vs-LF
+# phantom diffs from tools that write CRLF (e.g. PowerShell-generated game-version.json).
+* text=auto
+
+# Shell scripts must stay LF or they break when run.
+*.sh text eol=lf
