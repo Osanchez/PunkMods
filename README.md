@@ -14,13 +14,30 @@ In Steam: **PUNK Playtest → right‑click → Manage → Browse local files**.
 ### 2. Install the loader (first time only)
 Download **`BepInEx-Setup.zip`** and extract its contents into the game folder, so that `winhttp.dll` and the `BepInEx\` folder sit **next to `Punk.exe`** (choose merge/replace if Windows asks). Launch the game once — BepInEx initializes on this first, slightly slower launch — then quit. You only do this step once.
 
-### 3. Add the mods you want
-For each mod, download its **`<Mod>.zip`** and extract into the *same* game folder. Each drops a `BepInEx\plugins\<Mod>\` folder. Take as many or as few as you like — **Mods Menu** is recommended, since most mods expose their toggles through its in‑game menu.
+### 3. Install Mods Menu (recommended first)
+Download **`PunkModsMenu.zip`** and extract it into the game folder — it drops `BepInEx\plugins\PunkModsMenu\`. This is the framework that adds the in‑game **MODS** tab to Settings; most other mods expose their toggles through it.
 
-### 4. Launch & configure
-Start the game and open **Settings → MODS** for per‑mod toggles. After the first launch, each mod also writes a `.cfg` into `BepInEx\config\` that you can edit in a text editor (e.g. `PlayerCount`, `GamepadPollingHz`) and relaunch.
+> **Mods Menu shows nothing on its own.** It's a host, not a mod with its own options — the MODS tab only appears once you *also* have at least one mod installed that registers into it (step 4). Installing only Mods Menu and looking for a tab is the most common "it's not working" report; that's expected. (Mods still run and use their defaults without it — see step 5.)
 
-**Verify it worked:** open `BepInEx\LogOutput.log` in the game folder — near the end you should see `Chainloader startup complete`, plus a line for each mod that loaded.
+### 4. Add the mods you want
+For each mod, download its **`<Mod>.zip`** and extract into the *same* game folder. Each drops a `BepInEx\plugins\<Mod>\` folder. Take as many or as few as you like.
+
+### 5. Launch & configure
+Start the game and open **Settings → MODS** for per‑mod toggles. Each configurable mod also writes a `config.cfg` into its **own** folder — `BepInEx\plugins\<Mod>\config.cfg` — on first launch, pre‑filled with working defaults; edit it in a text editor (e.g. `PlayerCount`, `GamepadPollingHz`) and relaunch. Mods work out of the box with these defaults, with or without the MODS tab.
+
+**Verify it worked:** open `BepInEx\LogOutput.log` in the game folder — near the end you should see `Chainloader startup complete`, plus a line for each mod that loaded (e.g. `PUNK Damage Slow-Mo v1.0.0 loaded.`).
+
+### Troubleshooting
+
+Work top‑down — `BepInEx\LogOutput.log` (in the game folder, next to `Punk.exe`) answers almost everything:
+
+- **The MODS tab isn't in Settings.** Do you have a mod installed *besides* Mods Menu? Mods Menu is only the host — the tab appears once at least one other mod is present (see step 3). Check the log for `Injected MODS tab with N row(s).`; if you don't see it, no rows registered.
+- **`LogOutput.log` doesn't exist, or has no `Chainloader startup complete`.** BepInEx isn't loading at all. Confirm `winhttp.dll` sits **directly next to `Punk.exe`** (not in a subfolder), that you launched the game *once* after installing the loader, and that you're on 64‑bit Windows. If Steam re‑verified the game, `winhttp.dll` may have been removed — reinstall `BepInEx-Setup.zip`.
+- **Log shows `Chainloader startup complete` but a mod's `... loaded.` line is missing.** That mod's DLL isn't being found. It must be at `BepInEx\plugins\<Mod>\<Mod>.dll`. A common mistake is extracting the zip to the wrong place, nesting it an extra folder deep, or unblocking issues — re‑extract that mod's zip into the game folder (it already contains the `BepInEx\plugins\<Mod>\` path).
+- **A mod loads but does nothing.** Check its `BepInEx\plugins\<Mod>\config.cfg` — some default off (e.g. Sim Controller). Also check the log for a `... failed` warning from that mod.
+- **Everything worked yesterday, now nothing loads.** The Playtest almost certainly updated. A game update can break these mods until they're rebuilt against the new build — watch the log for Harmony/patch errors.
+
+When asking for help, paste `BepInEx\LogOutput.log` — it names exactly which stage failed.
 
 ### Updating & removing
 - **Update** a mod: re‑download its zip and extract over the old files (replace when asked).
