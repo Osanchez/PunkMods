@@ -47,8 +47,13 @@ foreach ($d in $managedDlls) {
 foreach ($d in $coreDlls) {
     $src = Join-Path $Core $d
     if (-not (Test-Path $src)) { throw "Referenced DLL missing from BepInEx core: $src" }
-    Copy-Item $src $StageCore -Force
 }
+# Stage the FULL BepInEx core, not just the compile-time references. CI's Copy-Loader packages this
+# folder into the public BepInEx-Setup.zip, and at runtime Doorstop needs the whole preloader chain
+# (BepInEx.Unity.Mono.Preloader, BepInEx.Preloader.Core, Mono.Cecil.*, MonoMod.*, ...). Staging only
+# the referenced DLLs shipped a loader whose target_assembly didn't exist - it silently never started.
+# (BepInEx is open source and redistributable; only Punk_Data\Managed is proprietary.)
+Copy-Item (Join-Path $Core '*') $StageCore -Recurse -Force
 
 # Loader redistributables + config, so CI can assemble the same extract-into-game package you build locally.
 foreach ($f in @('winhttp.dll','doorstop_config.ini','.doorstop_version','changelog.txt')) {

@@ -62,6 +62,12 @@ function Copy-Loader($dest) {
     }
     $core = Join-Path $GameDir 'BepInEx\core'
     if (-not (Test-Path $core)) { throw "BepInEx core not found at $core - is BepInEx installed in the game?" }
+    # Refuse to package a loader that can never start: Doorstop's target_assembly is the Mono
+    # preloader, which a compile-refs-only stub (stale punk-refs.zip) doesn't contain. Shipping
+    # without it produced a silent no-op loader for every downloader.
+    if (-not (Test-Path (Join-Path $core 'BepInEx.Unity.Mono.Preloader.dll'))) {
+        throw "BepInEx core at $core is missing BepInEx.Unity.Mono.Preloader.dll (partial install or stale refs stub) - refusing to package a broken loader. Re-run tools\update-refs.ps1 from a full install."
+    }
     # Copy the source 'core' folder to <dest>\BepInEx\core. The target must NOT pre-exist, or Copy-Item
     # would nest it as core\core. Callers create <dest>\BepInEx\plugins first, so BepInEx\ already exists.
     Copy-Item $core "$dest\BepInEx\core" -Recurse -Force
