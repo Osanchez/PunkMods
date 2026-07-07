@@ -158,10 +158,16 @@ namespace PunkFourPlayer
             {
                 if ((bool)AssignedF.GetValue(__instance)) return false;
 
+                // Discover controllers the game never announced. Steam Remote Play virtual pads show
+                // up in Gamepad.all but frequently DON'T fire InputSystem.onDeviceChange, so vanilla's
+                // auto-add (and our onDeviceChange-driven gate) never sees them. A per-frame sweep parks
+                // any such pad as "pending" so it can press Start to join like any other new controller.
+                JoinGate.DiscoverUndetectedPads(__instance);
+
                 // Let newly-connected ("new") controllers press Start to join the session, and show
-                // the join indicator while any are waiting.
+                // the join indicator while any are waiting (unless the screen is already full).
                 JoinGate.HandlePendingJoins(__instance);
-                JoinAddPrompt.Show(__instance, JoinGate.Pending.Count > 0);
+                JoinAddPrompt.Show(__instance, JoinGate.Pending.Count > 0 && JoinGate.HasRoom(__instance));
 
                 var rows = (RowsF.GetValue(__instance) as IEnumerable)?.Cast<InputSelectorDeviceRow>().ToList();
                 if (rows == null) return false;
@@ -291,8 +297,54 @@ namespace PunkFourPlayer
         internal static readonly HashSet<InputDevice> Pending = new HashSet<InputDevice>();
 
         private static readonly MethodInfo AddDeviceM = AccessTools.Method(typeof(InputSelectorScreen), "AddDevice");
+        private static readonly FieldInfo RowsF = AccessTools.Field(typeof(InputSelectorScreen), "rows");
 
         internal static void Reset() { Pending.Clear(); }
+
+        private static List<InputSelectorDeviceRow> GetRows(InputSelectorScreen screen)
+            => (RowsF.GetValue(screen) as IEnumerable)?.Cast<InputSelectorDeviceRow>().Where(r => r != null).ToList()
+               ?? new List<InputSelectorDeviceRow>();
+
+        // How many controllers have actually JOINED (have a device row). The keyboard is a spectator.
+        internal static int GamepadRowCount(InputSelectorScreen screen)
+            => GetRows(screen).Count(r => r.Device is Gamepad);
+
+        // Room for another player? Capped at the mod's max (Plugin.Target, 2..4). Prevents Start-spam
+        // adding rows past the supported player count.
+        internal static bool HasRoom(InputSelectorScreen screen)
+            => GamepadRowCount(screen) < Mathf.Clamp(Plugin.Target, 2, 4);
+
+        private static bool IsJoined(List<InputSelectorDeviceRow> rows, InputDevice device)
+        {
+            for (int i = 0; i < rows.Count; i++)
+                if (rows[i].Device == device) return true;
+            return false;
+        }
+
+        // Poll-based join for pads the game never announced (Remote Play). Any gamepad in Gamepad.all
+        // that isn't already a row and isn't already pending is parked as pending so it can press Start
+        // to join. The "already a row / already pending" checks are what enforce ONE join per physical
+        // controller — a joined pad is a row, so it's never re-parked and Start can't add a second slot.
+        internal static void DiscoverUndetectedPads(InputSelectorScreen screen)
+        {
+            try
+            {
+                if (Initializing) return;   // the OnEnable sweep owns the host-side pads on the first frame
+                var rows = GetRows(screen);
+                var pads = Gamepad.all;
+                for (int i = 0; i < pads.Count; i++)
+                {
+                    var g = pads[i];
+                    if (g == null || IsSim(g)) continue;      // sim pads auto-join via the AddDevice gate
+                    if (Pending.Contains(g)) continue;        // already waiting for Start
+                    if (IsJoined(rows, g)) continue;          // already has a slot (dedupe)
+                    Pending.Add(g);
+                    Plugin.Log.LogInfo($"Four-Player: detected controller '{g.name}' not announced by the game " +
+                        "(e.g. Steam Remote Play) — press Start to join.");
+                }
+            }
+            catch (Exception e) { Plugin.Log.LogWarning($"pad discovery failed: {e.Message}"); }
+        }
 
         // Emulated controllers from PunkSimController are named "PunkSim..."; treat them as dev tools.
         internal static bool IsSim(InputDevice device)
@@ -312,6 +364,14 @@ namespace PunkFourPlayer
             foreach (var dev in Pending)
                 if (dev is Gamepad g && g.startButton.wasPressedThisFrame) { joined = dev; break; }
             if (joined == null) return;
+
+            // Cap at the supported player count; a pad stays pending if the screen is full (a slot may
+            // free up if someone drops), but we never add a row beyond the max.
+            if (!HasRoom(screen))
+            {
+                Plugin.Log.LogInfo($"Four-Player: join ignored — already at the max {Mathf.Clamp(Plugin.Target, 2, 4)} controllers.");
+                return;
+            }
 
             Pending.Remove(joined);
             ForceAdd = true;
@@ -358,41 +418,58 @@ namespace PunkFourPlayer
         private static void Prefix(InputDevice device) => JoinGate.Pending.Remove(device);
     }
 
-    // The "PRESS START TO JOIN" indicator: a clone of the ASSIGN INPUT title, shown at the bottom
-    // whenever one or more new controllers are waiting to join.
+    // The "PRESS START TO JOIN" indicator: a clone of the ASSIGN INPUT title, shown near the TOP of
+    // the screen whenever one or more new controllers are waiting to join. It sits above the title and
+    // above the BEGIN prompt, so it never overlaps the P# header labels (y=-50) or the vanilla title.
     internal static class JoinAddPrompt
     {
+        // Dim secondary green (matches the join screen's P3 color) so it reads as a hint, not a title,
+        // and is visually distinct from the white "PRESS START TO BEGIN" prompt.
+        private static readonly Color PromptColor = new Color(0.62f, 0.85f, 0.62f, 1f);
+
         internal static void Show(InputSelectorScreen screen, bool visible)
         {
             try
             {
                 var go = Ensure(screen);
-                if (go != null && go.activeSelf != visible) go.SetActive(visible);
+                if (go == null) return;
+                if (visible) Reposition(screen, go);   // track the (possibly resized/lifted) title
+                if (go.activeSelf != visible) go.SetActive(visible);
             }
             catch { }
         }
 
+        // Sit centered near the top, above the "ASSIGN INPUT" title AND above the BEGIN prompt
+        // (title+80), so both can show at once without overlapping each other or the header row.
+        private static void Reposition(InputSelectorScreen screen, GameObject go)
+        {
+            var title = screen.transform.Find("Window/Players/Text") as RectTransform;
+            float baseY = (title != null) ? title.anchoredPosition.y : 4.12f;
+            if (go.GetComponent<RectTransform>() is RectTransform rt)
+                rt.anchoredPosition = new Vector2(0f, baseY + 150f);
+        }
+
         private static GameObject Ensure(InputSelectorScreen screen)
         {
-            var window = screen.transform.Find("Window");
-            if (window == null) return null;
-            var existing = window.Find("ModJoinPrompt");
+            var players = screen.transform.Find("Window/Players");
+            if (players == null) return null;
+            var existing = players.Find("ModJoinPrompt");
             if (existing != null) return existing.gameObject;
 
-            var title = window.Find("Players/Text");
+            var title = players.Find("Text");
             if (title == null) return null;
 
-            var clone = UnityEngine.Object.Instantiate(title.gameObject, window);
+            var clone = UnityEngine.Object.Instantiate(title.gameObject, players);
             clone.name = "ModJoinPrompt";
             if (clone.GetComponent<RectTransform>() is RectTransform rt)
             {
-                rt.anchorMin = new Vector2(0.5f, 0f);
-                rt.anchorMax = new Vector2(0.5f, 0f);
+                rt.anchorMin = new Vector2(0.5f, 1f);   // top-center of the header block
+                rt.anchorMax = new Vector2(0.5f, 1f);
                 rt.pivot = new Vector2(0.5f, 0.5f);
-                rt.anchoredPosition = new Vector2(0f, 96f);   // bottom-center, above the BACK button
                 rt.sizeDelta = new Vector2(1000f, 60f);
             }
-            SetText(clone.transform, "NEW CONTROLLER  -  PRESS START TO JOIN");
+            SetText(clone.transform, "PRESS START TO JOIN");
+            SetColor(clone.transform, PromptColor);
             clone.SetActive(false);
             return clone;
         }
@@ -404,6 +481,16 @@ namespace PunkFourPlayer
                 if (c == null) continue;
                 var p = c.GetType().GetProperty("text", typeof(string));
                 if (p != null && p.CanWrite) { p.SetValue(c, text); return; }
+            }
+        }
+
+        private static void SetColor(Transform t, Color color)
+        {
+            foreach (var c in t.GetComponents<Component>())
+            {
+                if (c == null) continue;
+                var p = c.GetType().GetProperty("color", typeof(Color));
+                if (p != null && p.CanWrite) { p.SetValue(c, color); return; }
             }
         }
     }

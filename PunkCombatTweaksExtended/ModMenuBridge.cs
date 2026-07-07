@@ -1,6 +1,6 @@
 using System;
 
-namespace PunkDamageSlowMo
+namespace PunkCombatTweaksExtended
 {
     /// <summary>Soft (reflection) hook into the optional PunkModsMenu framework — no hard dependency.</summary>
     internal static class ModMenuBridge

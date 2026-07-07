@@ -282,6 +282,9 @@ namespace PunkModsMenu
         internal RectTransform viewport;
         internal RectTransform content;
         internal float[] navTops;          // y-offset (from content top, downward) of each nav item
+        internal float[] navHeaderTops;    // per row: top of its visual block — the SECTION HEADER for a
+                                           // section's first row, else the row's own top. Scrolling up to
+                                           // this keeps the header on-screen (headers aren't nav items).
         internal float rowHeight = 72f;
         internal TMPro.TMP_Text tooltip;   // shows the selected row's mod description
 
@@ -305,10 +308,12 @@ namespace PunkModsMenu
                 float totalH = content.rect.height;
                 if (viewH <= 1f || totalH <= viewH) { content.anchoredPosition = new Vector2(content.anchoredPosition.x, 0f); return; }
 
-                float top = navTops[i], bottom = top + rowHeight;
+                float rowTop = navTops[i];
+                float headerTop = (navHeaderTops != null && i < navHeaderTops.Length) ? navHeaderTops[i] : rowTop;
+                float bottom = rowTop + rowHeight;
                 float s = content.anchoredPosition.y;
-                if (top < s) s = top;
-                else if (bottom > s + viewH) s = bottom - viewH;
+                if (headerTop < s) s = headerTop;                 // scroll up far enough to reveal the section header
+                else if (bottom > s + viewH) s = bottom - viewH;  // scroll down far enough to reveal the row
                 s = Mathf.Clamp(s, 0f, totalH - viewH);
                 content.anchoredPosition = new Vector2(content.anchoredPosition.x, s);
             }
@@ -396,6 +401,7 @@ namespace PunkModsMenu
 
                 // ---- rows grouped by mod, sections sorted alphabetically (unknown/empty last) ----
                 var navTops = new List<float>();
+                var navHeaderTops = new List<float>();
                 float cursorY = padTop;
 
                 var groups = ModMenu.Entries
@@ -406,12 +412,14 @@ namespace PunkModsMenu
 
                 foreach (var g in groups)
                 {
+                    float blockTop = cursorY;   // top of this section's block — the header if it has one
                     if (!string.IsNullOrEmpty(g.Key))
                     {
                         MakeSeparator(content, template, g.First().sectionLabel ?? g.Key);
                         cursorY += SepHeight + spacing;
                     }
 
+                    bool firstInSection = true;
                     foreach (var e in g)
                     {
                         var go = UnityEngine.Object.Instantiate(template.gameObject, content);
@@ -430,10 +438,14 @@ namespace PunkModsMenu
                         }
                         modsTab.bindings.Add(binding);
                         navTops.Add(cursorY);
+                        // First row of a section scrolls up to its header; later rows to themselves.
+                        navHeaderTops.Add(firstInSection ? blockTop : cursorY);
+                        firstInSection = false;
                         cursorY += modsTab.rowHeight + spacing;
                     }
                 }
                 modsTab.navTops = navTops.ToArray();
+                modsTab.navHeaderTops = navHeaderTops.ToArray();
                 modsTab.tooltip = MakeTooltip(tabGO, template);   // bottom band; updated on selection
 
                 foreach (var c in existing) UnityEngine.Object.DestroyImmediate(c.gameObject);   // drop the original (gameplay) rows
@@ -493,9 +505,11 @@ namespace PunkModsMenu
             var viewportGO = new GameObject("ModsViewport", typeof(RectTransform));
             var vpRT = viewportGO.GetComponent<RectTransform>();
             vpRT.SetParent(tabGO.transform, false);
-            vpRT.anchorMin = Vector2.zero; vpRT.anchorMax = Vector2.one;
-            vpRT.offsetMin = new Vector2(0f, 112f);   // leave a band at the bottom for the description tooltip
-            vpRT.offsetMax = Vector2.zero;
+            // Fill the tab, reserving a small bottom margin as a FRACTION of tab height (not pixels) so a
+            // scrolled-to-end row doesn't butt the edge. The description footer sits BELOW the tab (see
+            // MakeTooltip), so nothing here is tuned to a specific resolution.
+            vpRT.anchorMin = new Vector2(0f, 0.04f); vpRT.anchorMax = Vector2.one;
+            vpRT.offsetMin = Vector2.zero; vpRT.offsetMax = Vector2.zero;
             viewportGO.AddComponent<RectMask2D>();
             // Invisible graphic so clicks in the empty parts of the list are consumed here and don't
             // fall through to whatever screen is behind the Settings panel.
@@ -584,7 +598,10 @@ namespace PunkModsMenu
                 }
 
                 var itemName = go.transform.Find("Visual/ItemName");
-                SetText(itemName, $"<size=80%><color=#9a9aa2>{title}</color>   <color=#50505a>──────</color></size>");
+                // Amber/orange to match the menu's accent (selected options, active labels) so each mod's
+                // section header stands out from the rows and neighbouring sections. Dash rule is a dimmer
+                // shade of the same hue.
+                SetText(itemName, $"<size=80%><color=#EBA845>{title}</color>   <color=#7A5A28>──────</color></size>");
                 SetAlign(itemName, false);
 
                 var le = go.GetComponent<LayoutElement>() ?? go.AddComponent<LayoutElement>();
@@ -604,8 +621,14 @@ namespace PunkModsMenu
                 var go = new GameObject("ModTooltip", typeof(RectTransform));
                 var rt = go.GetComponent<RectTransform>();
                 rt.SetParent(tabGO.transform, false);
-                rt.anchorMin = new Vector2(0f, 0f); rt.anchorMax = new Vector2(1f, 0f); rt.pivot = new Vector2(0.5f, 0f);
-                rt.offsetMin = new Vector2(48f, 4f); rt.offsetMax = new Vector2(-48f, 78f);   // sits lower, clear of the last row
+                // Placement is entirely in ANCHOR FRACTIONS of the tab — no hard-coded pixels, so it
+                // scales to any resolution/aspect. Horizontally a centered ~64% column (forces wrapping,
+                // never reaches the screen edge). Vertically the anchors are NEGATIVE, which parks the
+                // band just BELOW the tab's row area (the empty strip under the last row) as a footer.
+                rt.anchorMin = new Vector2(0.18f, -0.24f);
+                rt.anchorMax = new Vector2(0.82f, -0.03f);
+                rt.offsetMin = Vector2.zero; rt.offsetMax = Vector2.zero;
+                rt.pivot = new Vector2(0.5f, 1f);
                 var t = go.AddComponent<TMPro.TextMeshProUGUI>();
                 if (font != null) t.font = font;
                 t.fontSize = 18; t.richText = true; t.enableWordWrapping = true;
@@ -677,8 +700,21 @@ namespace PunkModsMenu
             {
                 var b0 = (btns.GetValue(0) as Component).transform;
                 var b1 = (btns.GetValue(1) as Component).transform;
-                SetButtonLabel(b0, "<");
+                // The font draws "<" heavier/larger than ">", so the two arrows look mismatched. Use the
+                // SAME glyph for both — the smaller, correctly-sized ">" — and MIRROR the left one, so
+                // both are pixel-identical in size and weight whatever the font's per-glyph design.
+                // (Also equalize font size to kill any auto-size residue.)
+                SetButtonLabel(b0, ">");
                 SetButtonLabel(b1, ">");
+                var t0 = FindByName(b0, "Text (TMP)")?.GetComponent<TMPro.TMP_Text>();
+                var t1 = FindByName(b1, "Text (TMP)")?.GetComponent<TMPro.TMP_Text>();
+                if (t0 != null && t1 != null)
+                {
+                    float sz = Mathf.Min(t0.fontSize, t1.fontSize);
+                    if (sz > 1f) { t0.fontSize = sz; t1.fontSize = sz; }
+                    var s = t0.transform.localScale;
+                    t0.transform.localScale = new Vector3(-Mathf.Abs(s.x), s.y, s.z);   // mirror ">" -> "<"
+                }
                 pb0 = b0.GetComponent<PunkButton>();
                 pb1 = b1.GetComponent<PunkButton>();
             }

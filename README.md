@@ -25,7 +25,7 @@ For each mod, download its **`<Mod>.zip`** and extract into the *same* game fold
 ### 5. Launch & configure
 Start the game and open **Settings → MODS** for per‑mod toggles. Each configurable mod also writes a `config.cfg` into its **own** folder — `BepInEx\plugins\<Mod>\config.cfg` — on first launch, pre‑filled with working defaults; edit it in a text editor (e.g. `PlayerCount`, `GamepadPollingHz`) and relaunch. Mods work out of the box with these defaults, with or without the MODS tab.
 
-**Verify it worked:** open `BepInEx\LogOutput.log` in the game folder — near the end you should see `Chainloader startup complete`, plus a line for each mod that loaded (e.g. `PUNK Damage Slow-Mo v1.0.0 loaded.`).
+**Verify it worked:** open `BepInEx\LogOutput.log` in the game folder — near the end you should see `Chainloader startup complete`, plus a line for each mod that loaded (e.g. `PUNK Combat Tweaks Extended v1.1.0 loaded.`).
 
 ### Troubleshooting
 
@@ -65,7 +65,7 @@ Local & Remote Play co‑op uses **controllers**: one keyboard/mouse player plus
 
 ### Gameplay
 - **Seed Picker** — World-seed entry screen after class selection; also shows the seed on the pause menu.
-- **Damage Slow-Mo** — Toggles the brief slow-motion the game plays when a player takes damage.
+- **Combat Tweaks Extended** — In-game toggles to suppress the brief slow-motion on player damage and to remove all camera screen shake.
 - **Dash I-Frames** — Short invincibility window while dashing.
 - **Revive Item** — Adds the Revive Beacon, a shop consumable that revives a random downed player.
 - **Sell Vault Items** — Hover a spare module in the Vault and press the north face button (Y / Triangle, or a keyboard key) to sell it for its base shop buy price, credited to your run currency.

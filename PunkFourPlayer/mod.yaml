@@ -1,5 +1,5 @@
 # Metadata for the MODS menu section header: "<name> By <author> (v<version>)".
 name: Four Player
 author: Trihardest
-version: 0.1.0
+version: 0.2.0
 description: Local and Remote Play co-op for up to 4 players - dynamic join screen, extra ships and HUDs, and the ready-up profile picker.

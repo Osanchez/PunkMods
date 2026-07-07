@@ -38,7 +38,7 @@ Open `BepInEx\LogOutput.log` in the game folder. Near the end you should see:
 [Message:   BepInEx] Chainloader startup complete
 ```
 
-plus a line for each mod loading (e.g. `PUNK Damage Slow-Mo v1.0.0 loaded.`).
+plus a line for each mod loading (e.g. `PUNK Combat Tweaks Extended v1.1.0 loaded.`).
 
 ## Troubleshooting
 

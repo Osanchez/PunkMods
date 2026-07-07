@@ -182,9 +182,15 @@ namespace PunkMetaLoadout
             _scrollDown.gameObject.SetActive(_mode == Mode.List && _scrollTop + MaxVisible < _options.Count);
 
             _title.text = _mode == Mode.List ? $"PLAYER {_player + 1}  —  PROFILE" : $"PLAYER {_player + 1}  —  NAME";
+            // Solo shows keyboard keys (the common single-player case); the join screen keeps the
+            // controller glyphs since players ready up on a gamepad there.
             _hint.text = _mode == Mode.List
-                ? "<size=92%>↕ select    Ⓐ confirm    Ⓑ back    Ⓨ rename</size>"
-                : "<size=92%>move + Ⓐ to type    DONE / Enter confirm    Ⓑ back    (keyboard also types)</size>";
+                ? (_screen == null
+                    ? "<size=92%>↑↓ / W S select    Enter confirm    Esc back    F2 rename</size>"
+                    : "<size=92%>↕ select    Ⓐ confirm    Ⓑ back    Ⓨ rename</size>")
+                : (_screen == null
+                    ? "<size=92%>type on your keyboard    Enter confirm    Esc back</size>"
+                    : "<size=92%>move + Ⓐ to type    DONE / Enter confirm    Ⓑ back    (keyboard also types)</size>");
         }
 
         private void Update()
@@ -196,9 +202,11 @@ namespace PunkMetaLoadout
         private void NavList()
         {
             var gp = _device as Gamepad;
-            var kb = _device as Keyboard;
-            bool up    = P(gp?.dpad.up)   || P(gp?.leftStick.up)   || P(kb?.upArrowKey);
-            bool down  = P(gp?.dpad.down)  || P(gp?.leftStick.down) || P(kb?.downArrowKey);
+            // Solo (no join screen) also accepts the physical keyboard even when a gamepad is the bound
+            // device, so a keyboard player isn't locked out when a controller happens to be connected.
+            var kb = _device as Keyboard ?? (_screen == null ? Keyboard.current : null);
+            bool up    = P(gp?.dpad.up)   || P(gp?.leftStick.up)   || P(kb?.upArrowKey)   || P(kb?.wKey);
+            bool down  = P(gp?.dpad.down)  || P(gp?.leftStick.down) || P(kb?.downArrowKey) || P(kb?.sKey);
             bool ok    = P(gp?.buttonSouth) || P(kb?.enterKey) || P(kb?.numpadEnterKey);
             bool back  = P(gp?.buttonEast)  || P(kb?.escapeKey);
             bool rename = P(gp?.buttonNorth) || P(kb?.f2Key);
@@ -228,8 +236,9 @@ namespace PunkMetaLoadout
         private void NavName()
         {
             var gp = _device as Gamepad;
-            // Physical keyboard typing for a real keyboard player or a sim (driven by the keyboard).
-            if (_device is Keyboard || _isSim)
+            // Physical keyboard typing for a real keyboard player, a sim, or any solo run (so the
+            // keyboard works even when a connected gamepad became the bound device).
+            if (_device is Keyboard || _isSim || _screen == null)
             {
                 var phys = Keyboard.current;
                 if (phys != null)
@@ -246,7 +255,7 @@ namespace PunkMetaLoadout
             }
 
             // On-screen keyboard navigation (real gamepads use South to press; sims type physically).
-            var kb = _device as Keyboard;
+            var kb = _device as Keyboard ?? (_screen == null ? Keyboard.current : null);
             int dx = (P(gp?.dpad.right) || P(gp?.leftStick.right) || P(kb?.rightArrowKey) ? 1 : 0)
                    - (P(gp?.dpad.left)  || P(gp?.leftStick.left)  || P(kb?.leftArrowKey)  ? 1 : 0);
             int dy = (P(gp?.dpad.up)    || P(gp?.leftStick.up)    || P(kb?.upArrowKey)    ? 1 : 0)
@@ -367,6 +376,17 @@ namespace PunkMetaLoadout
                 if (o != null) UnityEngine.Object.Destroy(o.gameObject);
             }
             catch { }
+        }
+
+        // Self-heal the static open-flag. IsOpen gates every picker entry point (solo/join triggers)
+        // and the join-row freeze, but the overlay is a plain GameObject with no DontDestroyOnLoad — so
+        // when a run starts and the scene unloads, Unity destroys this object WITHOUT going through
+        // Close()/ForceClose(). Without this, IsOpen stays true forever and the picker never reopens
+        // (and co-op join rows stay frozen). Resetting here covers every destruction path — normal
+        // close, force close, scene change, or an error tearing the object down.
+        private void OnDestroy()
+        {
+            IsOpen = false;
         }
 
         private static bool P(ButtonControl b) => b != null && b.wasPressedThisFrame;

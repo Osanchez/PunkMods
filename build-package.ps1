@@ -32,7 +32,7 @@ $Stamp   = Get-Date -Format 'yyyyMMdd'
 # Dev builds (-Debug / -HotReload) compile unoptimized with symbols; distribution stays Release.
 $Config  = if ($Debug -or $HotReload) { 'Debug' } else { 'Release' }
 # Dev-only mods: built + deployed to the local install, but NEVER packaged into a distribution zip.
-$DevOnly = @('PunkDevReload')
+$DevOnly = @('PunkDevReload', 'PunkMinionTuning')
 
 Write-Host "Game folder: $GameDir"
 Write-Host "Mods folder: $ModsDir`n"
@@ -184,10 +184,20 @@ if ($PerMod) {
         if ($DevOnly -contains $p.BaseName) { continue }   # dev-only tools are never distributed
         $modStage = Join-Path $work $p.BaseName
         if (-not (Copy-Plugin $p $modStage)) { continue }
-        $modZip = Join-Path $DistDir "$($p.BaseName).zip"
+        # Embed the mod version in the zip name so a Release asset shows updates at a glance. Source it
+        # from mod.yaml (runtime-authoritative; matches [BepInPlugin]) — the .csproj <Version> is often
+        # stale. Fall back to the unversioned name if a mod has no mod.yaml / no version line.
+        $ver = $null
+        $yaml = Join-Path $p.Directory.FullName 'mod.yaml'
+        if (Test-Path $yaml) {
+            $m = Select-String -Path $yaml -Pattern '^\s*version:\s*(.+?)\s*$' | Select-Object -First 1
+            if ($m) { $ver = $m.Matches[0].Groups[1].Value.Trim('"',"'") }
+        }
+        $zipName = if ($ver) { "$($p.BaseName)-v$ver.zip" } else { "$($p.BaseName).zip" }
+        $modZip = Join-Path $DistDir $zipName
         # Zip the BepInEx folder so extraction lands at <game>\BepInEx\plugins\<Mod>\.
         Compress-Archive -Path (Join-Path $modStage 'BepInEx') -DestinationPath $modZip -Force
-        Write-Host "  + $($p.BaseName).zip" -ForegroundColor Green
+        Write-Host "  + $zipName" -ForegroundColor Green
     }
 
     Remove-Item $work -Recurse -Force

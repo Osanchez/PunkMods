@@ -1,0 +1,14 @@
+# Metadata for the MODS menu section header: "<name> By <author> (v<version>)".
+name: Minion Tuning
+author: Trihardest
+version: 1.0.0
+description: >-
+  Dev diagnostics + live tuning for MINIONS ("drones"), entirely in-game (no Mods-menu rows).
+  Logs each spawned drone's live Vision (range/refreshDelay), powerLevel/maxPowerLevelToFight and
+  faction, and lets you tune those on live drones to fix "slow to aggro". Hold LEFT ALT + a key:
+  Alt+D dump live drones; Alt+R full unit roster; Alt+= / Alt+- sight range up/down; Alt+] / Alt+[
+  scan interval up/down; Alt+0 reset vision tuning; Alt+N toggle target-nearest (ON by default);
+  Alt+B toggle defend-owner (drones attack units hostile to the owner + retaliate on owner damage,
+  blacklist-driven); Alt+S dump a drone's state machine; Alt+O show/hide an on-screen HUD. HOLD
+  POSITION: re-press the spawn button with a drone out to make it hold near where you are (still
+  dodging/attacking, returning after fights); re-press or move far away to release. Alt+H toggles it.

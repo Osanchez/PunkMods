@@ -201,6 +201,7 @@ a **Modding Notes** section with concrete Harmony targets.
 | 12 | [`12-ui-hud-menus.md`](12-ui-hud-menus.md) | HUD, screens, menus, widgets, input maps |
 | 13 | [`13-save-load-config.md`](13-save-load-config.md) | Save/load, mementos, config, settings, Steam/platform |
 | 14 | [`14-audio-camera-rendering.md`](14-audio-camera-rendering.md) | Audio/music, cameras, URP render features & FX |
+| 15 | [`15-minions-drones.md`](15-minions-drones.md) | Minions ("drones"): spawn/ownership, Vision scan cadence & range, target selection, friendly-fire analysis |
 
 ---
 

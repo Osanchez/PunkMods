@@ -1,7 +1,7 @@
 using System.IO;
 using System.Reflection;
 
-namespace PunkDamageSlowMo
+namespace PunkCombatTweaksExtended
 {
     internal static class ModFolder
     {

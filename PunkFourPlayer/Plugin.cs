@@ -30,7 +30,7 @@ namespace PunkFourPlayer
     {
         public const string Guid = "com.osanchez.punk.fourplayer";
         public const string Name = "PUNK Four Player (PoC)";
-        public const string Version = "0.1.0";
+        public const string Version = "0.2.0";
 
         internal static ManualLogSource Log;
         internal static ConfigEntry<int> PlayerCount;
