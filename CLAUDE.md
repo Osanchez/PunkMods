@@ -33,6 +33,11 @@ and Claude Code's auto-mode classifier hard-denies it.
 - After a game update, or after adding a new DLL `<Reference>` to a mod, run `tools/update-refs.ps1`
   to rebuild and re-upload the reference bundle. That also refreshes `game-version.json` (game
   version + Steam build id, stamped into the Release description by CI) — **commit it**.
+- A **pre-push guard** (`.githooks/pre-push` → `tools/check-refs.ps1`) blocks a push when the refs
+  bundle is stale — i.e. a `.csproj` references a DLL not in `punk-refs.zip`, or the installed Steam
+  build id no longer matches `game-version.json`. Both mean "run `tools/update-refs.ps1` first". Enable
+  it once per clone with `git config core.hooksPath .githooks`. Run the check any time with
+  `powershell -File tools/check-refs.ps1`; emergency bypass is `git push --no-verify`.
 
 ## Gotchas
 

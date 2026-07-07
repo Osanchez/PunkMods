@@ -1,0 +1,11 @@
+#!/bin/sh
+# Pre-push guard for the PUNK mods repo.
+# Blocks the push when the CI reference bundle (punk-refs.zip / the private 'refs' release) is stale:
+#   - a .csproj added a new DLL <Reference> that isn't in the bundle yet, or
+#   - the game was updated since refs were last built.
+# Both are fixed by:   powershell -File tools/update-refs.ps1   (then commit game-version.json)
+#
+# Enable in a fresh clone with:   git config core.hooksPath .githooks
+# Emergency bypass (skips the check): git push --no-verify
+powershell -NoProfile -File tools/check-refs.ps1
+exit $?
