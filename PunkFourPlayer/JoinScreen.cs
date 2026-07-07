@@ -339,8 +339,8 @@ namespace PunkFourPlayer
                     if (Pending.Contains(g)) continue;        // already waiting for Start
                     if (IsJoined(rows, g)) continue;          // already has a slot (dedupe)
                     Pending.Add(g);
-                    Plugin.Log.LogInfo($"Four-Player: detected controller '{g.name}' not announced by the game " +
-                        "(e.g. Steam Remote Play) — press Start to join.");
+                    Plugin.Log.LogInfo($"[join] detected controller '{g.name}' (id={g.deviceId}) not announced by the game " +
+                        "(Remote Play?) — held PENDING, press Start to join.");
                 }
             }
             catch (Exception e) { Plugin.Log.LogWarning($"pad discovery failed: {e.Message}"); }
@@ -378,7 +378,7 @@ namespace PunkFourPlayer
             try { AddDeviceM.Invoke(screen, new object[] { joined }); }   // creates the row (postfix re-lays out columns)
             catch (Exception e) { Plugin.Log.LogWarning($"join add failed: {e.Message}"); }
             finally { ForceAdd = false; }
-            Plugin.Log.LogInfo("A new controller joined via Start.");
+            Plugin.Log.LogInfo($"[join] controller '{joined.name}' (id={joined.deviceId}) JOINED via Start — {GamepadRowCount(screen)} controller row(s) now.");
         }
     }
 
@@ -394,7 +394,27 @@ namespace PunkFourPlayer
             // last session's picks). The profiles themselves are kept; only the slot assignments reset.
             if (ProfileBridge.Available) ProfileBridge.ClearSlots();
         }
-        private static void Postfix() { JoinGate.Initializing = false; }
+        private static void Postfix(InputSelectorScreen __instance)
+        {
+            JoinGate.Initializing = false;
+            JoinDebug.Snapshot(__instance, "input screen OPENED");
+        }
+    }
+
+    // Escaping back to the menu (screen disabled) clears the join state, so a fresh open always starts
+    // clean — a deliberate "reset if something looks wrong" escape hatch. We clear the pending set here;
+    // the vanilla OnEnable clears the device rows on the next open. FourPlayerRuntime.SlotDevices is
+    // intentionally NOT cleared: the ship spawner reads it AFTER the screen closes on a real start, and
+    // it's overwritten on the next join, so a stale value can't leak into a fresh session.
+    [HarmonyPatch(typeof(InputSelectorScreen), "OnDisable")]
+    internal static class JoinGate_OnDisable
+    {
+        private static void Postfix()
+        {
+            int pend = JoinGate.Pending.Count;
+            JoinGate.Reset();
+            Plugin.Log.LogInfo($"[join] input screen CLOSED — cleared {pend} pending controller(s); reopen starts clean.");
+        }
     }
 
     // Block auto-adding controllers that connect AFTER open; hold them pending until they press Start.
@@ -405,8 +425,9 @@ namespace PunkFourPlayer
         {
             if (JoinGate.Initializing || JoinGate.ForceAdd) return true;   // host-side sweep / deliberate join
             if (!(device is Gamepad)) return true;                         // keyboard/mouse unaffected
-            if (JoinGate.IsSim(device)) return true;                       // emulated controllers auto-join (dev tool)
+            if (JoinGate.IsSim(device)) { Plugin.Log.LogInfo($"[join] sim pad '{device.name}' (id={device.deviceId}) auto-joined."); return true; }
             JoinGate.Pending.Add(device);                                  // new controller waits for Start
+            Plugin.Log.LogInfo($"[join] controller '{device.name}' (id={device.deviceId}) connected after open — held PENDING (press Start to join).");
             return false;                                                  // skip the auto-add
         }
     }
@@ -492,6 +513,36 @@ namespace PunkFourPlayer
                 var p = c.GetType().GetProperty("color", typeof(Color));
                 if (p != null && p.CanWrite) { p.SetValue(c, color); return; }
             }
+        }
+    }
+
+    /// <summary>
+    /// Diagnostic snapshot of the join screen's input landscape — every gamepad the OS/Steam exposes
+    /// (name + id + sim flag), the keyboard state, the current device rows, and the pending set. Logged
+    /// on open and on every device add/remove so a "too many controllers" situation (e.g. Steam Remote
+    /// Play surfacing phantom/duplicate pads) is fully traceable from BepInEx\LogOutput.log.
+    /// </summary>
+    internal static class JoinDebug
+    {
+        internal static void Snapshot(InputSelectorScreen screen, string reason)
+        {
+            try
+            {
+                var pads = Gamepad.all;
+                var sb = new System.Text.StringBuilder();
+                sb.Append($"[join] {reason}: {pads.Count} gamepad(s), kbm={(Keyboard.current != null && Mouse.current != null)}");
+                for (int i = 0; i < pads.Count; i++)
+                {
+                    var g = pads[i];
+                    sb.Append($"\n         pad[{i}] '{g.name}' display='{g.displayName}' id={g.deviceId} sim={JoinGate.IsSim(g)}");
+                }
+                var rows = (AccessTools.Field(typeof(InputSelectorScreen), "rows").GetValue(screen) as IEnumerable)
+                    ?.Cast<InputSelectorDeviceRow>().Where(r => r != null).ToList() ?? new List<InputSelectorDeviceRow>();
+                sb.Append($"\n         rows={rows.Count} [{string.Join(", ", rows.Select(r => $"{r.Device?.name ?? "?"}@{r.Position}"))}]");
+                sb.Append($"  pending={JoinGate.Pending.Count} [{string.Join(", ", JoinGate.Pending.Select(d => d?.name ?? "?"))}]");
+                Plugin.Log.LogInfo(sb.ToString());
+            }
+            catch (Exception e) { Plugin.Log.LogWarning($"[join] snapshot failed: {e.Message}"); }
         }
     }
 }

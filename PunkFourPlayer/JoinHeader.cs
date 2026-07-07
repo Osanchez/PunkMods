@@ -10,10 +10,10 @@ using UnityEngine.InputSystem;
 namespace PunkFourPlayer
 {
     /// <summary>
-    /// Makes the co-op "ASSIGN INPUT" header dynamic: it shows one player column (P1..Pn) per
-    /// connected controller, clamped to [2, PlayerCount]. Rebuilds whenever a device is added or
-    /// removed. (Cosmetic for now — the device rows still slide between 2 positions; widening the
-    /// row movement + start logic to N columns is the next step.)
+    /// Makes the co-op "ASSIGN INPUT" header dynamic: one player column (P1..Pn) per connected input
+    /// device (each gamepad and the keyboard+mouse), clamped to [2, Target]. Rebuilds whenever a device
+    /// is added or removed; device rows slide between all N columns (see DeviceRowSetPosition) and the
+    /// start logic counts the claimed columns (see InputSelectorStart).
     /// </summary>
     internal static class JoinHeader
     {
@@ -38,9 +38,14 @@ namespace PunkFourPlayer
                 var rows = (AccessTools.Field(typeof(InputSelectorScreen), "rows").GetValue(screen) as IEnumerable)
                     ?.Cast<InputSelectorDeviceRow>().Where(r => r != null).ToList() ?? new List<InputSelectorDeviceRow>();
 
-                // Columns follow the number of controllers (gamepads); the keyboard is a spectator.
-                int gamepadCount = rows.Count(r => r.Device is Gamepad);
-                int n = Mathf.Clamp(gamepadCount, 2, Mathf.Clamp(Plugin.Target, 2, 4));
+                // One column per connected input DEVICE — every gamepad AND the keyboard+mouse row the
+                // game adds. So a player on the keyboard gets their own slot alongside the controllers
+                // (fixes "KBM + 2 controllers only shows 2 columns"). Manual claim still decides who
+                // actually plays; an unclaimed column just stays empty. Clamped to [2, Target] — which
+                // also gives the "KBM only if no controller" behavior: when Target controllers are
+                // present they fill all columns and the keyboard is squeezed out.
+                int deviceCount = rows.Count;
+                int n = Mathf.Clamp(deviceCount, 2, Mathf.Clamp(Plugin.Target, 2, 4));
 
                 // Capture each controller's CURRENT player choice BEFORE the layout changes, so we can
                 // keep them on the same player (just re-spaced) rather than letting columns shift.
@@ -176,12 +181,20 @@ namespace PunkFourPlayer
     [HarmonyPatch(typeof(InputSelectorScreen), "AddDevice")]
     internal static class JoinHeader_AddDevice
     {
-        private static void Postfix(InputSelectorScreen __instance) => JoinHeader.Rebuild(__instance);
+        private static void Postfix(InputSelectorScreen __instance)
+        {
+            JoinHeader.Rebuild(__instance);
+            JoinDebug.Snapshot(__instance, "device ADDED (row created)");
+        }
     }
 
     [HarmonyPatch(typeof(InputSelectorScreen), "RemoveDevice")]
     internal static class JoinHeader_RemoveDevice
     {
-        private static void Postfix(InputSelectorScreen __instance) => JoinHeader.Rebuild(__instance);
+        private static void Postfix(InputSelectorScreen __instance)
+        {
+            JoinHeader.Rebuild(__instance);
+            JoinDebug.Snapshot(__instance, "device REMOVED");
+        }
     }
 }
