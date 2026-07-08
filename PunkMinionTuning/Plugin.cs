@@ -10,6 +10,7 @@ using HarmonyLib;
 using UnityEngine;
 using UnityEngine.Events;
 using UnityEngine.InputSystem;
+using UnityEngine.UI;
 
 namespace PunkMinionTuning
 {
@@ -21,7 +22,8 @@ namespace PunkMinionTuning
     //  DLL. This mod patches spawn to read them live, logs them, and lets you rewrite them on live
     //  drones (config + hotkeys) so you can dial in values that fix "slow to aggro" without a rebuild.
     //
-    //  Everything is in-game (hotkeys) — this tool deliberately registers NOTHING in the Mods menu.
+    //  Driven by in-game hotkeys; the only Mods-menu row is a switch for the on-screen diagnostics
+    //  overlay ("Diagnostics overlay"), which is OFF by default.
     //
     //  HOTKEYS — hold LEFT ALT and press a key (main-keyboard only, no numpad; Alt keeps them from
     //  clashing with the game's bare keys and the other dev-tool mods' F-keys):
@@ -66,6 +68,8 @@ namespace PunkMinionTuning
         internal static ConfigEntry<bool> DefendOwner;
         internal static ConfigEntry<bool> SitCommand;
         internal static ConfigEntry<float> SitReleaseDistance;
+        internal static ConfigEntry<float> SitDeadzone;
+        internal static ConfigEntry<float> SitHoldSpeed;
         internal static ConfigEntry<float> RangeStep;
         internal static ConfigEntry<float> DelayStep;
         internal static ConfigEntry<bool> ShowOverlay;
@@ -91,12 +95,16 @@ namespace PunkMinionTuning
                 "Re-pressing the spawn button while a drone is already out toggles HOLD POSITION: the drone holds near where the player was, still dodges/attacks, and returns there after fights. Press again (or move far away) to release it back to following. New drones spawn following. Toggle the feature with Alt+H.");
             SitReleaseDistance = cfg.Bind("SitCommand", "AutoFollowDistance", 45f,
                 "If the owner gets farther than this from a holding drone, the drone auto-releases and follows again.");
+            SitDeadzone = cfg.Bind("SitCommand", "HoldRadius", 1f,
+                "A holding drone snaps to the exact hold point once within this distance (smaller = tighter pin).");
+            SitHoldSpeed = cfg.Bind("SitCommand", "HoldSpeed", 16f,
+                "How fast a holding drone travels to the hold point (units/sec). Higher = snappier repositioning.");
             RangeStep = cfg.Bind("Steps", "RangeStep", 5f,
                 "How much the Numpad +/- hotkeys change the sight range per press.");
             DelayStep = cfg.Bind("Steps", "DelayStep", 0.05f,
                 "How much the Numpad * // hotkeys change the scan interval per press.");
-            ShowOverlay = cfg.Bind("Overlay", "ShowOverlay", true,
-                "Show the on-screen HUD with current drone settings + toggle states. Toggle in-game with Alt+O.");
+            ShowOverlay = cfg.Bind("Overlay", "ShowOverlay", false,
+                "Show the on-screen HUD with current drone settings + toggle states. Off by default; toggle it from the MODS menu (\"Diagnostics overlay\") or in-game with Alt+O.");
 
             SetupAudio();
 
@@ -106,16 +114,23 @@ namespace PunkMinionTuning
             _harmony.PatchAll(typeof(OwnerThreatTargeting));
             _harmony.PatchAll(typeof(SitTogglePatch));
             _harmony.PatchAll(typeof(SitRedirectOrbit));
+            _harmony.PatchAll(typeof(HoldOwnerRange));
+
+            // The only Mods-menu row: a switch for the on-screen diagnostics overlay (off by default).
+            // Everything else stays on the Alt-hotkeys; this just gives a discoverable way to turn the
+            // dev HUD on without remembering Alt+O.
+            ModMenuBridge.AddToggle("Diagnostics overlay", () => ShowOverlay.Value, v => ShowOverlay.Value = v);
 
             Log.LogInfo($"{Name} v{Version} loaded. TargetNearest={TargetNearest.Value}, vision tuning " +
                         $"{(VisionRange.Value >= 0f || RefreshDelay.Value >= 0f ? "active" : "off (built-in)")}. " +
                         "Keys (hold Left Alt): O overlay; D dump live; S statemachine; R roster; =/- range; ]/[ delay; 0 reset vision; N nearest; B defend-owner; H hold-cmd. Re-press spawn = hold/release.");
         }
 
-        // Hot-reload teardown: undo patches.
+        // Hot-reload teardown: undo patches and drop our Mods-menu row.
         private void OnDestroy()
         {
             try { _harmony?.UnpatchSelf(); } catch { }
+            try { ModMenuBridge.RemoveAll(); } catch { }
         }
 
         // ── Audio feedback (procedural beeps; no game-asset dependency) ───────────────────────────
@@ -208,20 +223,19 @@ namespace PunkMinionTuning
                 string rng = VisionRange.Value >= 0f ? VisionRange.Value.ToString("0.###") : "<color=#9a9a9a>built-in</color>";
                 string dly = RefreshDelay.Value >= 0f ? RefreshDelay.Value.ToString("0.###") + "s" : "<color=#9a9a9a>built-in</color>";
 
-                int n = 0; string sample = "";
+                // One row PER live drone (not just the first) — with 3 drones out you see all 3, each
+                // with its own mode/state/target/vision. The header keeps the live count.
+                int n = 0; var droneRows = new List<string>();
                 foreach (var a in LiveMinions())
                 {
                     var v = MinionOps.GetVision(a);
                     if (v == null) continue;
                     n++;
-                    if (n == 1)
-                    {
-                        string tgt = "none";
-                        try { if (a.HasTarget && a.Target != null) tgt = a.Target.name; } catch { }
-                        string state = MinionOps.GetStateChain(a.Unit);
-                        string hold = SitManager.IsSitting(a.Unit) ? "HOLD" : "follow";
-                        sample = $"mode={hold}  state={state}  target={tgt}  range={v.Range:0.#} refresh={MinionOps.GetRefreshDelay(v):0.###}s";
-                    }
+                    string tgt = "none";
+                    try { if (a.HasTarget && a.Target != null) tgt = a.Target.name; } catch { }
+                    string state = MinionOps.GetStateChain(a.Unit);
+                    string hold = SitManager.IsSitting(a.Unit) ? "<color=#EBA845>HOLD</color>" : "follow";
+                    droneRows.Add($"<size=11>  #{n}  mode={hold}  state={state}  target={tgt}  range={v.Range:0.#} refresh={MinionOps.GetRefreshDelay(v):0.###}s</size>");
                 }
 
                 _overlayLines = new List<string>
@@ -232,9 +246,10 @@ namespace PunkMinionTuning
                     $"Hold command   : {(SitCommand.Value ? on : off)}   <size=11>Alt+H · re-press spawn · {SitManager.HoldingCount} holding</size>",
                     $"Sight range    : {rng}   <size=11>Alt +/- (step {RangeStep.Value:0.###})</size>",
                     $"Scan delay     : {dly}   <size=11>Alt ]/[ (step {DelayStep.Value:0.###})</size>",
-                    $"Live drones    : {n}" + (n > 0 ? $"   <size=11>[{sample}]</size>" : ""),
-                    "<size=11><color=#9a9a9a>Alt+0 reset · Alt+D dump · Alt+R roster</color></size>",
+                    $"Live drones    : {n}",
                 };
+                _overlayLines.AddRange(droneRows);
+                _overlayLines.Add("<size=11><color=#9a9a9a>Alt+0 reset · Alt+D dump · Alt+R roster</color></size>");
             }
             catch (Exception e) { WarnOnce("overlay refresh failed", e); }
         }
@@ -444,8 +459,12 @@ namespace PunkMinionTuning
         internal static readonly FieldInfo VisionF = AccessTools.Field(typeof(AIAgent), "vision");
         internal static readonly FieldInfo VisibleEnemiesF = AccessTools.Field(typeof(AIAgent), "visibleEnemies");
         internal static readonly FieldInfo VisibleEnemyCountF = AccessTools.Field(typeof(AIAgent), "visibleEnemyCount");
-        // MoveAroundOwnerAction's private owner reference — used to detect a held drone and suppress orbit.
+        // MoveAroundOwnerAction's private owner reference + orbit distance — for the hold redirect.
         internal static readonly FieldInfo MoveAroundUnitF = AccessTools.Field(typeof(MoveAroundOwnerAction), "unit");
+        internal static readonly FieldInfo MoveAroundDistF = AccessTools.Field(typeof(MoveAroundOwnerAction), "distance");
+        // OwnerIsWithinRangeCondition's private unit + maxDistance — to re-home "owner in range" onto the hold point.
+        internal static readonly FieldInfo OwnerRangeUnitF = AccessTools.Field(typeof(OwnerIsWithinRangeCondition), "unit");
+        internal static readonly FieldInfo OwnerRangeMaxF  = AccessTools.Field(typeof(OwnerIsWithinRangeCondition), "maxDistance");
         // SpawnMinionModule's private connection-type — to count this slot's minions for the "at max" check.
         internal static readonly FieldInfo SpawnConnTypeF = AccessTools.Field(typeof(SpawnMinionModule), "spawnMinionsConnectionType");
         // Unit's private serialized power fields (default 10 / 100 unless the prefab overrides them).
@@ -602,9 +621,11 @@ namespace PunkMinionTuning
                 if (Plugin.DumpOnSpawn.Value)
                     MinionOps.DumpValues("spawn", __instance, vision, agent);
 
-                // Register for the hold-position command; new drones always start following (not held).
+                // Register for the hold-position command (+ owner-damage retaliation). Derives owner,
+                // connection type and the damage hook from the drone itself, so it works the same for a
+                // fresh spawn and a restored-from-save drone. New drones always start following (not held).
                 if (agent != null)
-                    SitManager.Register(agent, entity != null ? entity.GetComponentInChildren<Unit>(true) : null);
+                    SitManager.Register(agent);
 
                 // Apply whichever vision values are tuned (>= 0). Untuned (-1) leaves the built-in value.
                 if (vision != null && (Plugin.VisionRange.Value >= 0f || Plugin.RefreshDelay.Value >= 0f))
@@ -614,22 +635,6 @@ namespace PunkMinionTuning
                     Plugin.Log.LogInfo($"[minion:spawn] applied vision tuning to {__instance.name}: " +
                                        $"Range={(Plugin.VisionRange.Value >= 0f ? Plugin.VisionRange.Value.ToString("0.###") : "built-in")}, " +
                                        $"refreshDelay={(Plugin.RefreshDelay.Value >= 0f ? Plugin.RefreshDelay.Value.ToString("0.###") : "built-in")}.");
-                }
-
-                // Fix #2 — retaliate on owner damage: when the OWNER's health takes a hit, make this drone
-                // angry at the attacker (HandleHitBy blacklists + targets it). `entity` is the owner passed
-                // to SetOwner; its onGotAttacked event carries the attacking Unit.
-                if (agent != null && entity != null)
-                {
-                    var ownerDmg = entity.GetComponentInChildren<DamagableResource>(true);
-                    if (ownerDmg != null && ownerDmg.onGotAttacked != null)
-                    {
-                        ownerDmg.onGotAttacked.AddListener((Unit attacker) =>
-                        {
-                            if (Plugin.DefendOwner != null && Plugin.DefendOwner.Value && agent != null && attacker != null)
-                                try { agent.HandleHitBy(attacker); } catch { }
-                        });
-                    }
                 }
             }
             catch (Exception e) { Plugin.WarnOnce("SetOwner postfix failed", e); }
@@ -733,9 +738,13 @@ namespace PunkMinionTuning
     // ─────────────────────────────────────────────────────────────────────────────────────────────
     internal static class SitManager
     {
-        private sealed class Reg { public AIAgent agent; public Unit unit; public Unit owner; public UnitMovement movement; public int id; }
+        private sealed class Reg
+        {
+            public AIAgent agent; public Unit unit; public Unit owner; public UnitMovement movement;
+            public Rigidbody2D rb; public int id; public Unit.OwnerConnectionType connection;   // rb: for the direct hold drive
+        }
         private static readonly List<Reg> _drones = new List<Reg>();
-        private static readonly Dictionary<int, Vector2> _sit = new Dictionary<int, Vector2>();
+        private static readonly Dictionary<int, Vector2> _sit = new Dictionary<int, Vector2>();   // drone id -> hold point
 
         internal static int HoldingCount => _sit.Count;
 
@@ -745,17 +754,111 @@ namespace PunkMinionTuning
             catch { return 0; }
         }
 
-        internal static void Register(AIAgent agent, Unit owner)
+        private static int OwnerId(Unit drone)
+        {
+            try { return (drone != null && drone.Owner != null) ? drone.Owner.instanceId : 0; }
+            catch { return 0; }
+        }
+
+        // Resolve the owner's Unit (for a reliable live transform) from the drone's Owner EntityData.
+        private static Unit ResolveOwnerUnit(Unit drone)
+        {
+            try
+            {
+                int oid = OwnerId(drone);
+                if (oid == 0) return null;
+                foreach (var un in Resources.FindObjectsOfTypeAll<Unit>())
+                {
+                    if (un == null) continue;
+                    try { if (un.gameObject.scene.IsValid() && InstanceId(un) == oid) return un; } catch { }
+                }
+            }
+            catch { }
+            return null;
+        }
+
+        // Register a drone — fresh spawn OR restored-from-save. Everything is derived from the drone
+        // itself (owner, connection type, owner-damage hook), so both paths behave identically. Idempotent.
+        internal static void Register(AIAgent agent)
         {
             try
             {
                 if (agent == null) return;
-                var u = agent.Unit; if (u == null) return;
+                var u = agent.Unit; if (u == null || u.Owner == null) return;   // minions only
                 int id = InstanceId(u); if (id == 0) return;
                 if (_drones.Exists(r => r.id == id)) return;   // already tracked
-                _drones.Add(new Reg { agent = agent, unit = u, owner = owner, movement = u.GetComponentInChildren<UnitMovement>(true), id = id });
+
+                var ownerUnit = ResolveOwnerUnit(u);
+                var conn = Unit.OwnerConnectionType.Undefined;
+                try { conn = u.ComponentData.ConnectionToOwner; } catch { }
+
+                _drones.Add(new Reg
+                {
+                    agent = agent, unit = u, owner = ownerUnit,
+                    movement = u.GetComponentInChildren<UnitMovement>(true),
+                    rb = u.GetComponentInChildren<Rigidbody2D>(true),
+                    id = id, connection = conn
+                });
+                SubscribeOwnerDamage(agent, ownerUnit);
+
+                // Auto-dump the first drone's state machine once, so the behaviour graph (re-group/idle/
+                // etc.) lands in the log without needing the Alt+S hotkey.
+                if (!_dumpedSM)
+                {
+                    _dumpedSM = true;
+                    try
+                    {
+                        Plugin.Log.LogInfo($"[sm] ===== auto-dump (first drone): {u.name} =====");
+                        MinionOps.DumpStateMachines(u);
+                        Plugin.Log.LogInfo("[sm] ===== end =====");
+                    }
+                    catch { }
+                }
             }
             catch (Exception e) { Plugin.WarnOnce("sit register failed", e); }
+        }
+        private static bool _dumpedSM;
+
+        // Owner-damage retaliation (DefendOwner fix #2): when the owner is hit, this drone gets angry at
+        // the attacker. Driven off the resolved owner so it works for restored drones too.
+        private static void SubscribeOwnerDamage(AIAgent agent, Unit ownerUnit)
+        {
+            try
+            {
+                if (agent == null || ownerUnit == null) return;
+                var dr = ownerUnit.GetComponentInChildren<DamagableResource>(true);
+                if (dr == null || dr.onGotAttacked == null) return;
+                dr.onGotAttacked.AddListener((Unit attacker) =>
+                {
+                    if (Plugin.DefendOwner != null && Plugin.DefendOwner.Value && agent != null && attacker != null)
+                        try { agent.HandleHitBy(attacker); } catch { }
+                });
+            }
+            catch (Exception e) { Plugin.WarnOnce("owner-damage hook failed", e); }
+        }
+
+        // Pick up drones the spawn hook never saw — restored-from-save drones (re-owned via the nested
+        // Unit.Data.SetOwner, which we don't patch) and any we missed. Throttled from Tick; Register is
+        // idempotent so re-scanning is cheap and safe.
+        private static void DiscoverDrones()
+        {
+            try
+            {
+                foreach (var a in Resources.FindObjectsOfTypeAll<AIAgent>())
+                {
+                    if (a == null) continue;
+                    try
+                    {
+                        if (!a.gameObject.scene.IsValid()) continue;
+                        var u = a.Unit;
+                        if (u == null || u.Owner == null) continue;              // minions only
+                        if (_drones.Exists(r => r.id == InstanceId(u))) continue; // already tracked
+                        Register(a);
+                    }
+                    catch { }
+                }
+            }
+            catch (Exception e) { Plugin.WarnOnce("sit discover failed", e); }
         }
 
         internal static bool IsSitting(Unit u)
@@ -766,37 +869,44 @@ namespace PunkMinionTuning
 
         internal static Vector2 GetHoldPos(Unit u) => _sit.TryGetValue(InstanceId(u), out var p) ? p : (Vector2)u.transform.position;
 
-        // Debounce: Activate fires every frame the spawn button is held, so treat a continuous stream of
-        // presses as ONE toggle — only act when there was a gap (button released + re-pressed).
-        private static float _lastToggle = -999f;
-        internal static void ToggleDebounced(Unit owner)
+        // Debounce keyed per (owner, connection): the spawn button fires Activate every frame it's held,
+        // so only the first press in a burst toggles. Keying by owner+connection means multiple players —
+        // and multiple drone modules on ONE player — never swallow each other's toggles.
+        private static readonly Dictionary<(int owner, int conn), float> _lastToggle = new Dictionary<(int, int), float>();
+        internal static void ToggleDebounced(Unit owner, Unit.OwnerConnectionType ct)
         {
+            var key = (InstanceId(owner), (int)ct);
             float now = Time.unscaledTime;
-            if (now - _lastToggle > 0.25f) Toggle(owner);
-            _lastToggle = now;
+            if (!_lastToggle.TryGetValue(key, out var last) || now - last > 0.25f) Toggle(owner, ct);
+            _lastToggle[key] = now;
         }
 
-        // Toggle hold for all of this owner's drones (any holding -> release all, else -> hold all here).
-        internal static void Toggle(Unit owner)
+        // Toggle hold for ONLY this owner's drones of THIS connection type — the drones from the module
+        // whose button was pressed. So one player's press never touches another player's drones, and a
+        // player with multiple drone modules holds/releases each group independently.
+        internal static void Toggle(Unit owner, Unit.OwnerConnectionType ct)
         {
             try
             {
                 if (owner == null) return;
                 Prune();
-                var mine = _drones.FindAll(r => r.owner == owner || (r.unit != null && r.unit.Owner != null && r.unit.Owner.instanceId == InstanceId(owner)));
+                int oid = InstanceId(owner);
+                var mine = _drones.FindAll(r => r.connection == ct && OwnerId(r.unit) == oid);
                 if (mine.Count == 0) return;
                 if (mine.Exists(r => _sit.ContainsKey(r.id)))
                 {
                     foreach (var r in mine) _sit.Remove(r.id);
                     Plugin.PlayRelease();
-                    Plugin.Log.LogInfo($"[sit] released {mine.Count} drone(s) — following owner again.");
+                    HoldHighlight.Set(owner, ct, false);
+                    Plugin.Log.LogInfo($"[sit] released {mine.Count} drone(s) [{ct}] — following owner again.");
                 }
                 else
                 {
                     Vector2 pos = owner.transform.position;
                     foreach (var r in mine) _sit[r.id] = pos;
                     Plugin.PlayEngage();
-                    Plugin.Log.LogInfo($"[sit] {mine.Count} drone(s) holding near ({pos.x:0.#}, {pos.y:0.#}).");
+                    HoldHighlight.Set(owner, ct, true);
+                    Plugin.Log.LogInfo($"[sit] {mine.Count} drone(s) [{ct}] holding near ({pos.x:0.#}, {pos.y:0.#}).");
                 }
             }
             catch (Exception e) { Plugin.WarnOnce("sit toggle failed", e); }
@@ -809,27 +919,177 @@ namespace PunkMinionTuning
         }
 
         // The drone travels to and orbits the hold point via the game's own follow movement (see
-        // SitRedirectOrbit). Tick only handles auto-release when the owner wanders too far, and pruning.
+        // SitRedirectOrbit). Tick discovers restored drones (throttled), auto-releases when the owner
+        // wanders too far, and prunes dead ones.
+        private static float _nextDiscover;
         internal static void Tick()
         {
             try
             {
                 if (Plugin.SitCommand == null || !Plugin.SitCommand.Value) return;
+                if (Time.unscaledTime >= _nextDiscover) { _nextDiscover = Time.unscaledTime + 1f; DiscoverDrones(); }
                 Prune();
                 if (_sit.Count == 0) return;
+                // Re-homing the follow logic (SitRedirectOrbit + HoldOwnerRange) keeps the drone AT the hold
+                // point instead of chasing the owner, but the drone's own push-movement is too lazy to get
+                // there fast or exactly. So while it isn't fighting, we drive its rigidbody straight to the
+                // point (fast approach + exact snap). Tick also auto-releases when the real owner is far.
                 float release = Plugin.SitReleaseDistance.Value;
+                float dead = Plugin.SitDeadzone.Value;
+                float speed = Plugin.SitHoldSpeed.Value;
+                float dt = Time.deltaTime;
                 foreach (var r in _drones)
                 {
-                    if (!_sit.ContainsKey(r.id) || r.unit == null || r.owner == null) continue;
-                    if (Vector2.Distance((Vector2)r.owner.transform.position, (Vector2)r.unit.transform.position) > release)
+                    if (!_sit.ContainsKey(r.id) || r.unit == null) continue;
+                    Vector2 hold = _sit[r.id];
+                    Vector2 dronePos = r.unit.transform.position;
+
+                    Vector2 ownerPos = r.owner != null ? (Vector2)r.owner.transform.position
+                                     : (r.unit.Owner != null ? (Vector2)r.unit.Owner.position : dronePos);
+                    if (Vector2.Distance(ownerPos, dronePos) > release)
                     {
                         _sit.Remove(r.id);   // owner too far -> auto-follow again
                         Plugin.PlayRelease();
+                        HoldHighlight.Set(r.owner, r.connection, false);
+                        continue;
+                    }
+
+                    bool fighting = r.agent != null && r.agent.HasTarget;
+                    if (!fighting && r.rb != null)
+                    {
+                        Vector2 toHold = hold - dronePos;
+                        float d = toHold.magnitude;
+                        if (d > dead) r.rb.velocity = toHold.normalized * speed;               // decisive travel to the spot
+                        else { r.rb.velocity = Vector2.zero; r.rb.position = Vector2.MoveTowards(r.rb.position, hold, speed * dt); }  // snap exactly
                     }
                 }
             }
             catch (Exception e) { Plugin.WarnOnce("sit tick failed", e); }
         }
+    }
+
+    // Amber highlight on the drone's ability-slot button, on the HUD of the specific owner that's
+    // holding. Maps (owner, connection type) -> that owner's ShipHud -> the matching AbilitySlot, and
+    // toggles an amber border overlay. Per-player: only the holding player's own drone button lights up.
+    internal static class HoldHighlight
+    {
+        private static readonly Color Amber = new Color(1f, 0.55f, 0.06f, 1f);
+        private const float Thickness = 4f;   // border strip width, px
+        private const float Inset = 10f;      // pull the frame in from the icon rect so it hugs the octagon
+
+        // Keyed by (owner instanceId, connection type) -> our amber frame parented onto that button.
+        // The frame is parented to the button (not the drone) so it survives drone death/respawn.
+        private static readonly Dictionary<(int, int), GameObject> _frames = new Dictionary<(int, int), GameObject>();
+
+        internal static void Set(Unit owner, Unit.OwnerConnectionType ct, bool on)
+        {
+            try
+            {
+                int oid = OwnerId(owner);
+                if (oid == 0) return;
+                var key = (oid, (int)ct);
+
+                if (on)
+                {
+                    if (_frames.TryGetValue(key, out var existing) && existing != null)
+                    {
+                        existing.SetActive(true);
+                        return;
+                    }
+                    // The button's own "Highlight" is the FIRST child of Visual -> renders BEHIND the opaque
+                    // slot background + icon, so recolouring it shows nothing; the game only reveals it by
+                    // scaling (the screen-fill we saw via SetHighlighted's animator). So we build our own
+                    // top-most amber frame instead: a hollow 4-strip border on the LAST sibling, sized to
+                    // the icon. Nothing animates it, so it just stays until we hide it.
+                    var slot = FindSlot(owner, ct);
+                    var parent = slot != null && slot.icon != null ? FindVisual(slot.icon.transform) : null;
+                    if (parent == null) return;
+                    _frames[key] = BuildFrame(parent);
+                }
+                else
+                {
+                    if (_frames.TryGetValue(key, out var f) && f != null) f.SetActive(false);
+                }
+            }
+            catch (Exception e) { Plugin.WarnOnce("hold highlight failed", e); }
+        }
+
+        // Hollow amber frame stretched over the icon: four solid strips (top/bottom/left/right) anchored
+        // to the parent's edges, so it's exactly the button's size regardless of resolution.
+        private static GameObject BuildFrame(RectTransform parent)
+        {
+            var root = new GameObject("ModHoldBorder", typeof(RectTransform));
+            var rt = root.GetComponent<RectTransform>();
+            rt.SetParent(parent, false);
+            rt.anchorMin = Vector2.zero; rt.anchorMax = Vector2.one;
+            rt.offsetMin = new Vector2(Inset, Inset); rt.offsetMax = new Vector2(-Inset, -Inset);   // compress onto the octagon
+            rt.SetAsLastSibling();   // draw on top of the icon layers
+
+            // (anchorMin, anchorMax, offsetMin, offsetMax) per edge strip.
+            AddStrip(rt, new Vector2(0, 1), new Vector2(1, 1), new Vector2(0, -Thickness), new Vector2(0, 0)); // top
+            AddStrip(rt, new Vector2(0, 0), new Vector2(1, 0), new Vector2(0, 0), new Vector2(0, Thickness));  // bottom
+            AddStrip(rt, new Vector2(0, 0), new Vector2(0, 1), new Vector2(0, 0), new Vector2(Thickness, 0));  // left
+            AddStrip(rt, new Vector2(1, 0), new Vector2(1, 1), new Vector2(-Thickness, 0), new Vector2(0, 0)); // right
+            return root;
+        }
+
+        private static void AddStrip(RectTransform parent, Vector2 aMin, Vector2 aMax, Vector2 oMin, Vector2 oMax)
+        {
+            var go = new GameObject("edge", typeof(RectTransform), typeof(Image));
+            var rt = go.GetComponent<RectTransform>();
+            rt.SetParent(parent, false);
+            rt.anchorMin = aMin; rt.anchorMax = aMax;
+            rt.offsetMin = oMin; rt.offsetMax = oMax;
+            var img = go.GetComponent<Image>();
+            img.sprite = null;            // null sprite -> Image draws a solid amber quad
+            img.color = Amber;
+            img.raycastTarget = false;
+        }
+
+        private static int OwnerId(Unit owner)
+        {
+            try { return owner != null && owner.ComponentData?.entity != null ? owner.ComponentData.entity.instanceId : 0; }
+            catch { return 0; }
+        }
+
+        // The "Visual" child holds the layered icon graphics (102x102); fall back to the icon root.
+        private static RectTransform FindVisual(Transform iconRoot)
+        {
+            if (iconRoot == null) return null;
+            var v = iconRoot.Find("Visual") as RectTransform;
+            return v != null ? v : iconRoot as RectTransform;
+        }
+
+        private static AbilitySlot FindSlot(Unit owner, Unit.OwnerConnectionType ct)
+        {
+            int oid = 0;
+            try { oid = owner != null && owner.ComponentData != null && owner.ComponentData.entity != null ? owner.ComponentData.entity.instanceId : 0; } catch { }
+            if (oid == 0) return null;
+
+            foreach (var hud in Resources.FindObjectsOfTypeAll<ShipHud>())
+            {
+                if (hud == null) continue;
+                try
+                {
+                    if (!hud.gameObject.scene.IsValid() || hud.Ship == null || hud.abilitySlotsPanel == null) continue;
+                    var u = hud.Ship.GetComponent<Unit>();
+                    if (u == null || u.ComponentData?.entity?.instanceId != oid) continue;
+                    var p = hud.abilitySlotsPanel;
+                    switch (ct)
+                    {
+                        case Unit.OwnerConnectionType.PrimaryWeapon:   return p.primaryWeaponSlot;
+                        case Unit.OwnerConnectionType.SecondaryWeapon: return p.secondaryWeaponSlot;
+                        case Unit.OwnerConnectionType.Active1:         return p.activeSlot1;
+                        case Unit.OwnerConnectionType.Active2:         return p.activeSlot2;
+                        case Unit.OwnerConnectionType.Active3:         return p.activeSlot3;
+                        default: return null;
+                    }
+                }
+                catch { }
+            }
+            return null;
+        }
+
     }
 
     // Re-pressing the spawn button while already at max drones for this slot toggles hold-position.
@@ -851,7 +1111,7 @@ namespace PunkMinionTuning
                     if (m != null && m.ConnectionToOwner == ct) count++;
                 if (count > 0 && count >= __instance.Level)   // at max for this drone slot
                 {
-                    SitManager.ToggleDebounced(owner);
+                    SitManager.ToggleDebounced(owner, ct);   // scope the toggle to THIS module's drones
                     return false;   // this press is a hold toggle — skip vanilla spawn/block feedback
                 }
             }
@@ -860,9 +1120,10 @@ namespace PunkMinionTuning
         }
     }
 
-    // While a drone is holding, redirect the owner-orbit target to the HOLD POINT by briefly overriding
-    // the owner's stored position during FindPath (restored immediately after). The drone then travels to
-    // and orbits the hold point using the game's own follow movement — no fighting the movement system.
+    // Re-home the drone's follow movement onto the HOLD POINT. MoveAroundOwnerAction (used by both the
+    // Idle and Regroup states) orbits unit.Owner.position at a random `distance`. While holding, we
+    // briefly override the owner position to the hold point AND the orbit distance to ~0 during FindPath,
+    // so the drone paths to the EXACT hold point using its own proven movement (restored right after).
     [HarmonyPatch(typeof(MoveAroundOwnerAction), "FindPath")]
     internal static class SitRedirectOrbit
     {
@@ -871,23 +1132,57 @@ namespace PunkMinionTuning
             __state = null;
             try
             {
-                if (Plugin.SitCommand == null || !Plugin.SitCommand.Value) return;
+                if (Plugin.SitCommand == null || !Plugin.SitCommand.Value || SitManager.HoldingCount == 0) return;
                 var unit = MinionOps.MoveAroundUnitF?.GetValue(__instance) as Unit;
                 if (unit == null || !SitManager.IsSitting(unit)) return;
                 var owner = unit.Owner;
                 if (owner == null) return;
+
                 Vector2 hold = SitManager.GetHoldPos(unit);
-                __state = new object[] { owner, owner.position };                 // save real owner position
-                owner.position = new Vector3(hold.x, hold.y, owner.position.z);   // orbit the hold point instead
+                object oldDist = MinionOps.MoveAroundDistF?.GetValue(__instance);
+                // Zeroed MinMaxFloat -> RandomInRange() == 0 -> the orbit target collapses onto the point.
+                object zeroDist = MinionOps.MoveAroundDistF != null ? Activator.CreateInstance(MinionOps.MoveAroundDistF.FieldType) : null;
+
+                __state = new object[] { owner, owner.position, oldDist };
+                owner.position = new Vector3(hold.x, hold.y, owner.position.z);
+                if (zeroDist != null) MinionOps.MoveAroundDistF.SetValue(__instance, zeroDist);
             }
             catch { __state = null; }
         }
 
-        // Finalizer always runs (even on exception) so the owner's real position is restored.
-        private static void Finalizer(object[] __state)
+        // Finalizer always runs (even on exception) so the owner position + orbit distance are restored.
+        private static void Finalizer(MoveAroundOwnerAction __instance, object[] __state)
         {
-            try { if (__state != null && __state[0] is EntityData owner) owner.position = (Vector3)__state[1]; }
+            try
+            {
+                if (__state == null) return;
+                if (__state[0] is EntityData owner) owner.position = (Vector3)__state[1];
+                if (__state[2] != null) MinionOps.MoveAroundDistF?.SetValue(__instance, __state[2]);
+            }
             catch { }
+        }
+    }
+
+    // Re-home "is the owner within range?" onto the hold point for a holding drone. The Idle/Regroup
+    // transitions key off this; pointing it at the hold point means the drone regards the HOLD POINT as
+    // home (and never tries to Regroup back to the real owner), so it settles there instead of chasing you.
+    [HarmonyPatch(typeof(OwnerIsWithinRangeCondition), "IsFulfilled")]
+    internal static class HoldOwnerRange
+    {
+        private static bool Prefix(OwnerIsWithinRangeCondition __instance, ref bool __result)
+        {
+            try
+            {
+                if (Plugin.SitCommand == null || !Plugin.SitCommand.Value || SitManager.HoldingCount == 0) return true;
+                var unit = MinionOps.OwnerRangeUnitF?.GetValue(__instance) as Unit;
+                if (unit == null || !SitManager.IsSitting(unit)) return true;
+                Vector2 hold = SitManager.GetHoldPos(unit);
+                float maxD = MinionOps.OwnerRangeMaxF != null ? (float)MinionOps.OwnerRangeMaxF.GetValue(__instance) : 0f;
+                __result = ((Vector2)unit.transform.position - hold).sqrMagnitude < maxD * maxD;
+                return false;   // skip original (which measures against the real owner)
+            }
+            catch { }
+            return true;
         }
     }
 }

@@ -3,7 +3,8 @@ name: Minion Tuning
 author: Trihardest
 version: 1.0.0
 description: >-
-  Dev diagnostics + live tuning for MINIONS ("drones"), entirely in-game (no Mods-menu rows).
+  Dev diagnostics + live tuning for MINIONS ("drones"), driven by in-game hotkeys (one Mods-menu
+  row: a "Diagnostics overlay" switch, off by default).
   Logs each spawned drone's live Vision (range/refreshDelay), powerLevel/maxPowerLevelToFight and
   faction, and lets you tune those on live drones to fix "slow to aggro". Hold LEFT ALT + a key:
   Alt+D dump live drones; Alt+R full unit roster; Alt+= / Alt+- sight range up/down; Alt+] / Alt+[
