@@ -1,0 +1,14 @@
+# Metadata for the MODS menu section header: "<name> By <author> (v<version>)".
+name: Drones Enhanced
+author: Trihardest
+version: 1.0.0
+description: >-
+  Smarter, commandable drones ("minions"). HOLD POSITION: with a drone out, press its spawn button
+  again to make it hold where you're standing — it keeps dodging and fighting, returns after each
+  fight, and an amber border lights up that drone's button on your HUD (per-player, so co-op players
+  each command their own). Press again or walk far away to release; new drones spawn following.
+  DEFEND OWNER: drones attack anything hostile to you — units that have you on their enemy list (a
+  crawler you provoked) and anything that damages you. TARGET NEAREST: drones lock the closest
+  visible enemy instead of an arbitrary one. All three are on by default.
+  Also includes an optional developer overlay (MODS menu "Diagnostics overlay", off by default; Alt+O)
+  and Alt-hotkeys for live vision tuning — see the mod's README.

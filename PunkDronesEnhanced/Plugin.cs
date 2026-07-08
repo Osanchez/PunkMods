@@ -12,10 +12,11 @@ using UnityEngine.Events;
 using UnityEngine.InputSystem;
 using UnityEngine.UI;
 
-namespace PunkMinionTuning
+namespace PunkDronesEnhanced
 {
     // ─────────────────────────────────────────────────────────────────────────────────────────────
-    //  PUNK Minion Tuning — dev diagnostics + live tuning for MINIONS ("drones").
+    //  PUNK Drones Enhanced — drone commands (hold-position, defend-owner, target-nearest) plus live
+    //  diagnostics/tuning for MINIONS ("drones", the game's internal term for the deployable units).
     //
     //  WHY: A minion's Vision.range / Vision.refreshDelay are [SerializeField] floats with no C#
     //  initializer, so their real values live on the prefab and can't be read statically from the
@@ -54,13 +55,13 @@ namespace PunkMinionTuning
     [BepInPlugin(Guid, Name, Version)]
     public class Plugin : BaseUnityPlugin
     {
-        public const string Guid = "com.osanchez.punk.miniontuning";
-        public const string Name = "PUNK Minion Tuning";
+        public const string Guid = "com.osanchez.punk.dronesenhanced";
+        public const string Name = "PUNK Drones Enhanced";
         public const string Version = "1.0.0";
 
         internal static ManualLogSource Log;
 
-        // ── Config (BepInEx/plugins/PunkMinionTuning/config.cfg) ──────────────────────────────────
+        // ── Config (BepInEx/plugins/PunkDronesEnhanced/config.cfg) ─────────────────────────────────
         internal static ConfigEntry<bool> DumpOnSpawn;
         internal static ConfigEntry<float> VisionRange;    // -1 = leave the drone's built-in value alone
         internal static ConfigEntry<float> RefreshDelay;   // -1 = leave the drone's built-in value alone
@@ -240,7 +241,7 @@ namespace PunkMinionTuning
 
                 _overlayLines = new List<string>
                 {
-                    "<b><color=#EBA845>MINION TUNING</color></b>   <size=11>(Alt+O hide)</size>",
+                    "<b><color=#EBA845>DRONES ENHANCED</color></b>   <size=11>(Alt+O hide)</size>",
                     $"Target nearest : {(TargetNearest.Value ? on : off)}   <size=11>Alt+N</size>",
                     $"Defend owner   : {(DefendOwner.Value ? on : off)}   <size=11>Alt+B (blacklist-driven)</size>",
                     $"Hold command   : {(SitCommand.Value ? on : off)}   <size=11>Alt+H · re-press spawn · {SitManager.HoldingCount} holding</size>",

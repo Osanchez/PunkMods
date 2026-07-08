@@ -1,7 +1,7 @@
 using System.IO;
 using System.Reflection;
 
-namespace PunkMinionTuning
+namespace PunkDronesEnhanced
 {
     internal static class ModFolder
     {

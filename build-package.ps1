@@ -32,7 +32,7 @@ $Stamp   = Get-Date -Format 'yyyyMMdd'
 # Dev builds (-Debug / -HotReload) compile unoptimized with symbols; distribution stays Release.
 $Config  = if ($Debug -or $HotReload) { 'Debug' } else { 'Release' }
 # Dev-only mods: built + deployed to the local install, but NEVER packaged into a distribution zip.
-$DevOnly = @('PunkDevReload', 'PunkMinionTuning')
+$DevOnly = @('PunkDevReload')
 
 Write-Host "Game folder: $GameDir"
 Write-Host "Mods folder: $ModsDir`n"
