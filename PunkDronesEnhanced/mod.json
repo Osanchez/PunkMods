@@ -1,0 +1,25 @@
+{
+  "schemaVersion": 1,
+  "id": "PunkDronesEnhanced",
+  "name": "Drones Enhanced",
+  "author": "Trihardest",
+  "version": "1.0.0",
+  "gameVersion": "0.12.10",
+  "description": "Smarter, commandable drones. HOLD POSITION parks a drone where you stand, DEFEND OWNER makes drones attack anything hostile to you, and TARGET NEAREST locks the closest visible enemy. All three on by default.",
+  "category": "Combat",
+  "iconUrl": null,
+  "homepage": "https://github.com/Osanchez/PunkMods",
+  "tags": [
+    "combat",
+    "drones"
+  ],
+  "pluginFolder": "PunkDronesEnhanced",
+  "dependencies": [
+    "PunkModsMenu"
+  ],
+  "download": {
+    "repo": "Osanchez/PunkMods",
+    "assetPattern": "PunkDronesEnhanced-v*.zip"
+  },
+  "sha256": null
+}

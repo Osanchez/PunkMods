@@ -1,0 +1,22 @@
+{
+  "schemaVersion": 1,
+  "id": "PunkInputTweaks",
+  "name": "Input Tweaks",
+  "author": "Trihardest",
+  "version": "1.0.0",
+  "gameVersion": "0.12.10",
+  "description": "Raises the Input System polling rate to cut gamepad input latency (helps controller and Remote Play players).",
+  "category": "Quality of Life",
+  "iconUrl": null,
+  "homepage": "https://github.com/Osanchez/PunkMods",
+  "tags": [
+    "input"
+  ],
+  "pluginFolder": "PunkInputTweaks",
+  "dependencies": [],
+  "download": {
+    "repo": "Osanchez/PunkMods",
+    "assetPattern": "PunkInputTweaks-v*.zip"
+  },
+  "sha256": null
+}

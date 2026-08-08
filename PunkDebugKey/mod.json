@@ -1,0 +1,22 @@
+{
+  "schemaVersion": 1,
+  "id": "PunkDebugKey",
+  "name": "Debug Menu Key",
+  "author": "Trihardest",
+  "version": "2.1.0",
+  "gameVersion": "0.12.10",
+  "description": "Opens the game's built-in developer debug menu with F1.",
+  "category": "Developer",
+  "iconUrl": null,
+  "homepage": "https://github.com/Osanchez/PunkMods",
+  "tags": [
+    "developer"
+  ],
+  "pluginFolder": "PunkDebugKey",
+  "dependencies": [],
+  "download": {
+    "repo": "Osanchez/PunkMods",
+    "assetPattern": "PunkDebugKey-v*.zip"
+  },
+  "sha256": null
+}

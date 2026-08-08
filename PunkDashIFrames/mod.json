@@ -1,0 +1,22 @@
+{
+  "schemaVersion": 1,
+  "id": "PunkDashIFrames",
+  "name": "Dash I-Frames",
+  "author": "Trihardest",
+  "version": "1.0.0",
+  "gameVersion": "0.12.10",
+  "description": "Grants a short window of invincibility while dashing, so you can dash through lasers and bullets.",
+  "category": "Combat",
+  "iconUrl": null,
+  "homepage": "https://github.com/Osanchez/PunkMods",
+  "tags": [
+    "combat"
+  ],
+  "pluginFolder": "PunkDashIFrames",
+  "dependencies": [],
+  "download": {
+    "repo": "Osanchez/PunkMods",
+    "assetPattern": "PunkDashIFrames-v*.zip"
+  },
+  "sha256": null
+}

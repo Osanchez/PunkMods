@@ -1,0 +1,25 @@
+{
+  "schemaVersion": 1,
+  "id": "PunkCombatTweaksExtended",
+  "name": "Combat Tweaks Extended",
+  "author": "Trihardest",
+  "version": "1.1.0",
+  "gameVersion": "0.12.10",
+  "description": "Combat feel tweaks with in-game toggles — suppress the slow-motion on player damage and remove all camera screen shake.",
+  "category": "Combat",
+  "iconUrl": null,
+  "homepage": "https://github.com/Osanchez/PunkMods",
+  "tags": [
+    "combat",
+    "feel"
+  ],
+  "pluginFolder": "PunkCombatTweaksExtended",
+  "dependencies": [
+    "PunkModsMenu"
+  ],
+  "download": {
+    "repo": "Osanchez/PunkMods",
+    "assetPattern": "PunkCombatTweaksExtended-v*.zip"
+  },
+  "sha256": null
+}

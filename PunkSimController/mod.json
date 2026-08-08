@@ -1,0 +1,22 @@
+{
+  "schemaVersion": 1,
+  "id": "PunkSimController",
+  "name": "Sim Controller",
+  "author": "Trihardest",
+  "version": "1.0.0",
+  "gameVersion": "0.12.10",
+  "description": "Debug tool that spawns simulated controllers to test the co-op join and start flow without extra hardware.",
+  "category": "Developer",
+  "iconUrl": null,
+  "homepage": "https://github.com/Osanchez/PunkMods",
+  "tags": [
+    "developer"
+  ],
+  "pluginFolder": "PunkSimController",
+  "dependencies": [],
+  "download": {
+    "repo": "Osanchez/PunkMods",
+    "assetPattern": "PunkSimController-v*.zip"
+  },
+  "sha256": null
+}

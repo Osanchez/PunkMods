@@ -1,0 +1,22 @@
+{
+  "schemaVersion": 1,
+  "id": "SellVaultItems",
+  "name": "Sell Vault Items",
+  "author": "Trihardest",
+  "version": "1.0.0",
+  "gameVersion": "0.12.10",
+  "description": "Hover a spare module in the Vault and press the north face button (Y / Triangle) to sell it back for its base shop buy price, credited to your run currency.",
+  "category": "Quality of Life",
+  "iconUrl": null,
+  "homepage": "https://github.com/Osanchez/PunkMods",
+  "tags": [
+    "economy"
+  ],
+  "pluginFolder": "SellVaultItems",
+  "dependencies": [],
+  "download": {
+    "repo": "Osanchez/PunkMods",
+    "assetPattern": "SellVaultItems-v*.zip"
+  },
+  "sha256": null
+}

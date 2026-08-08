@@ -42,6 +42,63 @@ $projects = Get-ChildItem $ModsDir -Recurse -Filter *.csproj |
     Where-Object { $_.FullName -notmatch '\\(bin|obj|dist)\\' }
 if (-not $projects) { throw "No .csproj projects found under $ModsDir" }
 
+# 1b) Validate each distributed mod's mod.json before anything is built or packaged.
+# PUNK Nexus gates installs on an exact gameVersion match and reads the installed version out of
+# this file, so a missing, mislabelled or stale manifest ships a mod the client will refuse or
+# misreport. Failing here is much cheaper than failing on a user's machine.
+function Test-ModManifest($project) {
+    $name = $project.BaseName
+    $path = Join-Path $project.Directory.FullName 'mod.json'
+    if (-not (Test-Path $path)) {
+        return "$name : missing mod.json (required for distribution - see PunkNexus docs/MOD_AUTHORING.md)"
+    }
+    try { $m = Get-Content $path -Raw | ConvertFrom-Json }
+    catch { return "$name : mod.json is not valid JSON - $($_.Exception.Message)" }
+
+    if (-not $m.id)      { return "$name : mod.json has no 'id'" }
+    if (-not $m.version) { return "$name : mod.json has no 'version'" }
+    if (-not $m.gameVersion) { return "$name : mod.json has no 'gameVersion'" }
+    if ($m.id -ne $name) { return "$name : mod.json id '$($m.id)' does not match the folder name" }
+
+    # mod.yaml still drives the in-game MODS menu label and the release zip name. If the two
+    # disagree, one of them is wrong and the mismatch would surface as a phantom update in the
+    # client - so refuse rather than guess which is authoritative.
+    $yaml = Join-Path $project.Directory.FullName 'mod.yaml'
+    if (Test-Path $yaml) {
+        $ym = Select-String -Path $yaml -Pattern '^\s*version:\s*(.+?)\s*$' | Select-Object -First 1
+        if ($ym) {
+            $yv = $ym.Matches[0].Groups[1].Value.Trim('"',"'")
+            if ($yv -ne $m.version) {
+                return "$name : version mismatch - mod.yaml says '$yv', mod.json says '$($m.version)'"
+            }
+        }
+    }
+
+    # The declared gameVersion must match the build the repo is currently targeting.
+    $gvFile = Join-Path $ModsDir 'game-version.json'
+    if (Test-Path $gvFile) {
+        $gv = (Get-Content $gvFile -Raw | ConvertFrom-Json).version
+        if ($gv -and $m.gameVersion -ne $gv) {
+            return "$name : mod.json gameVersion '$($m.gameVersion)' does not match game-version.json '$gv'"
+        }
+    }
+    return $null
+}
+
+$manifestErrors = @()
+foreach ($p in $projects) {
+    if ($DevOnly -contains $p.BaseName) { continue }   # never distributed, so never validated
+    $err = Test-ModManifest $p
+    if ($err) { $manifestErrors += $err }
+}
+if ($manifestErrors) {
+    Write-Host "`
+mod.json validation failed:" -ForegroundColor Red
+    $manifestErrors | ForEach-Object { Write-Host "  - $_" -ForegroundColor Red }
+    throw "Fix the mod.json problems above before packaging."
+}
+Write-Host "mod.json validated for all distributed mods." -ForegroundColor Green
+
 $buildSet = $projects
 if ($HotReload) {
     $buildSet = $projects | Where-Object { $_.BaseName -eq $HotReload }
@@ -79,7 +136,8 @@ function Copy-Loader($dest) {
     }
 }
 
-# Stage one mod's plugin folder (DLL + mod.yaml) under $dest\BepInEx\plugins\<Mod>\. Returns $true on success.
+# Stage one mod's plugin folder (DLL + mod.yaml + mod.json) under $dest\BepInEx\plugins\<Mod>\.
+# Returns $true on success.
 function Copy-Plugin($project, $dest) {
     $dll = Join-Path $project.Directory.FullName "bin\Release\$($project.BaseName).dll"
     if (-not (Test-Path $dll)) { Write-Warning "missing build output: $dll"; return $false }
@@ -88,6 +146,10 @@ function Copy-Plugin($project, $dest) {
     Copy-Item $dll $modDir -Force
     $yaml = Join-Path $project.Directory.FullName 'mod.yaml'
     if (Test-Path $yaml) { Copy-Item $yaml $modDir -Force }   # label metadata read by PunkModsMenu
+    # mod.json is the distribution manifest PUNK Nexus reads: the same file it fetches from this
+    # repo has to land in the install, or the client cannot tell which version is on disk.
+    $json = Join-Path $project.Directory.FullName 'mod.json'
+    if (Test-Path $json) { Copy-Item $json $modDir -Force }
     return $true
 }
 
@@ -106,6 +168,8 @@ function Deploy-LocalPlugin($project, $config, $withPdb) {
     }
     $yaml = Join-Path $project.Directory.FullName 'mod.yaml'
     if (Test-Path $yaml) { Copy-Item $yaml $modDir -Force }
+    $json = Join-Path $project.Directory.FullName 'mod.json'
+    if (Test-Path $json) { Copy-Item $json $modDir -Force }
     return $true
 }
 
@@ -157,6 +221,8 @@ elseif (Test-Path $livePlugins) {
         Copy-Item (Join-Path $p.Directory.FullName "bin\Release\$($p.BaseName).dll") $modDir -Force
         $yaml = Join-Path $p.Directory.FullName 'mod.yaml'
         if (Test-Path $yaml) { Copy-Item $yaml $modDir -Force }
+        $json = Join-Path $p.Directory.FullName 'mod.json'
+        if (Test-Path $json) { Copy-Item $json $modDir -Force }
     }
     Write-Host "Local install refreshed (per-mod folders)." -ForegroundColor Green
 }

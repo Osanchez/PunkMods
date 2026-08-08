@@ -1,0 +1,22 @@
+{
+  "schemaVersion": 1,
+  "id": "PunkMetaLoadout",
+  "name": "Meta Loadout",
+  "author": "Trihardest",
+  "version": "2.0.0",
+  "gameVersion": "0.12.10",
+  "description": "Persists each player's ship build per class and profile across runs; profiles are chosen on the player-select screen.",
+  "category": "Quality of Life",
+  "iconUrl": null,
+  "homepage": "https://github.com/Osanchez/PunkMods",
+  "tags": [
+    "progression"
+  ],
+  "pluginFolder": "PunkMetaLoadout",
+  "dependencies": [],
+  "download": {
+    "repo": "Osanchez/PunkMods",
+    "assetPattern": "PunkMetaLoadout-v*.zip"
+  },
+  "sha256": null
+}

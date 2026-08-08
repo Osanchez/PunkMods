@@ -1,0 +1,22 @@
+{
+  "schemaVersion": 1,
+  "id": "PunkSeedPicker",
+  "name": "Seed Picker",
+  "author": "Trihardest",
+  "version": "1.0.0",
+  "gameVersion": "0.12.10",
+  "description": "Adds a world-seed entry screen after class selection so you can type or randomize the run's seed.",
+  "category": "Quality of Life",
+  "iconUrl": null,
+  "homepage": "https://github.com/Osanchez/PunkMods",
+  "tags": [
+    "world"
+  ],
+  "pluginFolder": "PunkSeedPicker",
+  "dependencies": [],
+  "download": {
+    "repo": "Osanchez/PunkMods",
+    "assetPattern": "PunkSeedPicker-v*.zip"
+  },
+  "sha256": null
+}

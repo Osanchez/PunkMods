@@ -1,0 +1,23 @@
+{
+  "schemaVersion": 1,
+  "id": "PunkScoreboard",
+  "name": "Scoreboard",
+  "author": "Trihardest",
+  "version": "1.1.0",
+  "gameVersion": "0.12.10",
+  "description": "Hold Tab for a co-op scoreboard — per-player kills, bosses, deaths, damage dealt, time alive, HP, and fuel.",
+  "category": "Co-op",
+  "iconUrl": null,
+  "homepage": "https://github.com/Osanchez/PunkMods",
+  "tags": [
+    "co-op",
+    "hud"
+  ],
+  "pluginFolder": "PunkScoreboard",
+  "dependencies": [],
+  "download": {
+    "repo": "Osanchez/PunkMods",
+    "assetPattern": "PunkScoreboard-v*.zip"
+  },
+  "sha256": null
+}
