@@ -220,7 +220,7 @@ End-to-end trace of a typical hit (projectile shown; other sources differ only a
 
 ### AddExplosionEffect: WeaponAugmentation (`IProjectileModifier, IHasPerProjectileCost, IHasDescriptionForWeapon`)
 - **Fields:** `Resource damageType`; `FloatSeries damageAmount`; per-projectile cost; `bool addImpactExplosion/addTimeoutExplosion`; `float explosionRadiusIncrement`; `FloatSeries burn`. Prop `Damage DamageForCurrentLevel`.
-- **Logic:** `ModifyProjectile` adds damage to the projectile's `Explosion`, increments radius, adds burn, and enables impact/timeout explosion behaviours.
+- **Logic:** `ModifyProjectile` adds damage to the projectile's `Explosion`, increments radius, adds burn, and enables impact/timeout explosion behaviors.
 
 ### AddImpactExplosionEffect / IncreaseExplosionRadiusEffect: ModuleEffect : IWeaponModifier
 - `AddImpactExplosionEffect.Modify` enables `ImpactBehaviour.spawnExplosion` on a `ProjectileWeapon`.

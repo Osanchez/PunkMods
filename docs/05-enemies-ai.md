@@ -7,8 +7,8 @@ PUNK enemies are ordinary game `Unit`s (see the entity/component docs) that carr
 
 1. **Generation / distribution.** During level generation `EnemyGenerator.PlaceEnemies` walks every `LevelGraphNode`, derives a per-room "power level" budget from the dominant `Ecosystem`'s difficulty curves (scaled by `PoI.difficultyMultiplier`), then repeatedly draws enemies from a weighted `Ecosystem.EnemyDistribution` and spends their `powerLevel` until the budget is exhausted. Each drawn enemy is instantiated as an `EntityData` and added to the level `EntityManager`. Its `Unit.Data.SpawnRoomIndex` is stamped so AI movement can be confined to the spawn room.
 2. **Perception.** A `Vision` component (a `ComponentScanner<Unit>`) periodically `OverlapCircle`s for nearby `Unit`s and line-of-sight tests them against blocking layers. `AIAgent` consumes the visible list each frame, sorting units into friends/enemies via `Faction` allies/enemies lists (plus per-instance black/white lists), and picks a `currentTarget`.
-3. **Behaviour.** An `AIAgent` plus a Unity-GameObject-based behaviour tree drives the enemy. The tree is a `StateMachine` whose children are `State` GameObjects; each `State` holds Action components (movement, aiming, shooting, etc.) that run while it is active, and `Transition` components whose `Condition` lists decide when to switch states.
-4. **Reaction.** `AggroWhenHit` / `WaitForTargetAction` / `GotAttackedCondition` let an enemy acquire a target and switch to attack or flee behaviour when damaged. `Unit.IsAfraidOf` (target `powerLevel` > `maxPowerLevelToFight`) governs flee-vs-fight.
+3. **Behaviour.** An `AIAgent` plus a Unity-GameObject-based behavior tree drives the enemy. The tree is a `StateMachine` whose children are `State` GameObjects; each `State` holds Action components (movement, aiming, shooting, etc.) that run while it is active, and `Transition` components whose `Condition` lists decide when to switch states.
+4. **Reaction.** `AggroWhenHit` / `WaitForTargetAction` / `GotAttackedCondition` let an enemy acquire a target and switch to attack or flee behavior when damaged. `Unit.IsAfraidOf` (target `powerLevel` > `maxPowerLevelToFight`) governs flee-vs-fight.
 5. **Bosses.** A boss is just an enemy whose state hierarchy contains a `BossStateActivator`; entering that state notifies the global `BossStateManager`, which the `BossHealthbar` UI listens to. Multi-phase bosses use ordinary states + `RepeateChildrenAction` loops.
 
 ## AI Behavior Model
@@ -73,7 +73,7 @@ Unit (+ AIAgent, Vision, Seeker, UnitMovement, Shooter, AggroWhenHit)
 | `EnemyList` | MonoBehaviour | Debug enemy-spawn palette UI |
 | `Ecosystem` | ScriptableObject | Enemy distribution + difficulty curves |
 | `StateMachine` | MonoBehaviour | FSM driver |
-| `State` | MonoBehaviour | A behaviour state (GameObject) |
+| `State` | MonoBehaviour | A behavior state (GameObject) |
 | `Transition` | MonoBehaviour | Condition-gated state edge |
 | `Condition` | abstract MonoBehaviour | Predicate base |
 | `MovementAction` | abstract MonoBehaviour | Pathfinding move base |
@@ -120,7 +120,7 @@ Unit (+ AIAgent, Vision, Seeker, UnitMovement, Shooter, AggroWhenHit)
 - **Key methods:** `Scan()` does `Physics2D.OverlapCircleNonAlloc` then a `LinecastNonAlloc` LoS test per hit (respecting `ignoredColliders`), keeping unblocked components for which `IsVisible(component)` is true. `VisibleComponents` exposes the set. `IsVisible` is `virtual` (override point).
 
 ### Faction : ScriptableObject `[CreateAssetMenu "Punk/Faction"]`
-- **Purpose:** Defines inter-group relationships. (Note: the `fileName` attribute is mislabelled "Weapon".)
+- **Purpose:** Defines inter-group relationships. (Note: the `fileName` attribute is mislabeled "Weapon".)
 - **Key fields:** `allies` (`List<Faction>`), `enemies` (`List<Faction>`); exposed as `Allies`/`Enemies`. Relationship is membership-based — a unit is friends/enemies with another if the other's faction is contained in this faction's allies/enemies list (see `Unit.IsFriendsWith`/`IsEnemiesWith`).
 
 ### Enemy : SavableComponent<Enemy.Data> (ModuleGridOwner.IModuleGridInitializer)
@@ -166,7 +166,7 @@ Abstract bases documented in **AI Behavior Model**. `MovementAction` notable ser
 | `MoveTowardsTargetAction` | Repeatedly re-paths to the current target while active | `pathFindingDelay` (0.25) |
 | `MoveToTargetLastKnownPositionAction` | Paths to `agent.TargetLastKnownPosition` (± random offset) | `offset` |
 | `MoveAroundTargetAction` | Paths to a point orbiting the target at a random distance/angle (fixed or relative direction) | `useFixDirection`, `distance`, `angleDeltaFromTarget`, `direction` |
-| `MoveAroundOwnerAction` | Same orbit logic but around `unit.Owner` (minion behaviour) | `unit`, `distance`, `angleDeltaFromTarget` |
+| `MoveAroundOwnerAction` | Same orbit logic but around `unit.Owner` (minion behavior) | `unit`, `distance`, `angleDeltaFromTarget` |
 | `MoveAwayFromTargetAction` | Each frame moves directly away from target (no pathfinding) | `movement`, `agent`, `stopOnExit` |
 | `MoveInRandomDirectionAction` | A* `RandomPath` of random length within `distance` | `distance` |
 | `MoveToPositionAction` | **Stub** — fields declared, no logic in this build | `agent`, `destinationSource`, `movement`, `arrivalDistance`, `transitionOnArrival`, `stopOnExit` |
@@ -183,7 +183,7 @@ Abstract bases documented in **AI Behavior Model**. `MovementAction` notable ser
 | Action | What it does | Key fields |
 |---|---|---|
 | `ShootAction` | Holds fire until past `delay`, target within `shootingDistance`, aim within `maxAimAngle`, and resource recharged; toggles `Shooter` shooting | `shooter`, `aimAtTargetAction`, `agent`, `delay`, `resourceAmountToWait`, `maxAimAngle`, `stopWhenAngleTooBig`, `shootingDistance`, `stopWhenDistanceTooBig` |
-| `ShootComplexAction` | Multi-shooter firing: `Continous`/`Grouped`/`Once`, instant or trigger-pull, with bursts and group cycling | `shooters[]`, `delay`, `behaviour`, `shootMethod`, `fireRate`, `groupSize`, `groupCount`, `burstCount`, `burstDelay`, `triggePullDuration` |
+| `ShootComplexAction` | Multi-shooter firing: `Continous`/`Grouped`/`Once`, instant or trigger-pull, with bursts and group cycling | `shooters[]`, `delay`, `behavior`, `shootMethod`, `fireRate`, `groupSize`, `groupCount`, `burstCount`, `burstDelay`, `triggePullDuration` |
 | `ActivateShooterAction` | Turns a `Shooter` on after `delay`; off on exit | `shooter`, `delay` |
 | `ApplyTorqueAction` | Spins a rigidbody (Left/Right/Random) up to `maxAngularVelocity` | `rigidbody`, `direction`, `initialTorque`, `torque`, `maxAngularVelocity` |
 | `PushSelfAction` | One-shot random force + torque impulse on enable | `rigidbody`, `force`, `torque` |
@@ -273,15 +273,15 @@ All inherit `Condition` (so all support the `invert` flag).
 - **Key fields:** `rowPrefab`, `animator`, `unitSize`, `rowSpacing`, `maxUnitPerRow`, `deltaMoveSpeed`, `deltaMoveDelay`.
 
 ### BossHealthbarRow : MonoBehaviour
-- One row of pips. `Init(Resource, capacity, unitSize)` sizes/colours it; `SetValue(value, delta)` resizes the fill and delta images. Property: `Capacity`, `RectTransform`.
+- One row of pips. `Init(Resource, capacity, unitSize)` sizes/colors it; `SetValue(value, delta)` resizes the fill and delta images. Property: `Capacity`, `RectTransform`.
 
 ## Modding Notes
 
-PUNK has **no central "AI tick"** to patch — behaviour emerges from per-component `Update`/`OnEnable` methods that are all valid Harmony targets. Because enemies are prefabs assembled from these components, two modding strategies exist: (a) Harmony-patch the C# methods below, or (b) at runtime find/spawn enemy GameObjects and toggle/replace their state-machine components.
+PUNK has **no central "AI tick"** to patch — behavior emerges from per-component `Update`/`OnEnable` methods that are all valid Harmony targets. Because enemies are prefabs assembled from these components, two modding strategies exist: (a) Harmony-patch the C# methods below, or (b) at runtime find/spawn enemy GameObjects and toggle/replace their state-machine components.
 
 ### Enemy health / damage scaling
 - **Health is a `Unit` resource tank**, not an `Enemy` field. Scale it via `Enemy.Initialize` (the embedded `ModifyResourceCapacity` effect already gets a co-op multiplier there — a postfix can apply your own factor) or by patching `Unit`'s tank install/capacity methods (`InstallNewTank`, `IncreaseCapacity`).
-- **Outgoing damage:** patch `ShootAction`/`ShootComplexAction` (fire gating) or the underlying `Shooter`/weapon, and `ChargerHead.OnObjectHit` / `Hazard.GetDamage` for contact damage. `DamageConditions.Validate` gates damage-reactive behaviour.
+- **Outgoing damage:** patch `ShootAction`/`ShootComplexAction` (fire gating) or the underlying `Shooter`/weapon, and `ChargerHead.OnObjectHit` / `Hazard.GetDamage` for contact damage. `DamageConditions.Validate` gates damage-reactive behavior.
 - **Kill accounting:** `Enemy.Data.OnDestroy` → `RunData.RegisterEnemyKilled`; `countsAsKill` controls whether a unit counts.
 
 ### Disable / neuter AI

@@ -314,6 +314,6 @@ Two places hold the numbers, and they behave differently:
 ### DI / lifecycle gotchas
 - Weapons are built by `WeaponFactory`, resolved via `ServiceLocator.Get<WeaponFactory>()`. New weapon types must be added to `WeaponFactory.Create` (it throws `NotImplementedException` otherwise). Patch `Create` (postfix) to inject augmentations or swap prefabs.
 - The live ship weapon is rebuilt on every module-grid refresh (`ModuleSlotWeaponHolder.RecreateWeapon`), so any runtime property changes you make are **lost on rebuild**. To persist, patch at creation (factory/ctor) or hook `WeaponHolder.WeaponChanged`.
-- `WeaponBase.Fire` is `async UniTaskVoid` and uses a `CancellationTokenSource` cancelled in `Dispose`; long bursts stop when the weapon is disposed (weapon swap). `Projectile.FireSub`/sub-emitter shots use `.Forget()`.
+- `WeaponBase.Fire` is `async UniTaskVoid` and uses a `CancellationTokenSource` canceled in `Dispose`; long bursts stop when the weapon is disposed (weapon swap). `Projectile.FireSub`/sub-emitter shots use `.Forget()`.
 - `Projectile` integrates movement in `FixedUpdate` with manual `CircleCast` (not a Rigidbody), while `PhysicsProjectile` uses real `Rigidbody2D` physics + `OnCollision/Trigger`. Patches must target the right one (`ProjectileWeapon.UsePhysics` decides which prefab is spawned).
 - Effect aggregation for tooltips lives in `WeaponBase.Get*WithAllAugmentations`; if you add custom augmentations and want correct UI numbers, mirror those methods.

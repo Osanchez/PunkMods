@@ -20,7 +20,7 @@ Besides the terrain itself (cells/tiles, biomes), the PUNK world is populated by
 
 | Class | Kind | Role |
 |---|---|---|
-| `Station` | MonoBehaviour : `SavableComponent<Station.Data>` | Runtime station behaviour: unlock, shop, upgrades, hatch |
+| `Station` | MonoBehaviour : `SavableComponent<Station.Data>` | Runtime station behavior: unlock, shop, upgrades, hatch |
 | `Station.Data` | data + memento originator | Saved station state (upgrades, connections, light polygon) |
 | `StationConnection` | MonoBehaviour | Procedural pipe mesh + traveling "bulge" between two stations |
 | `StationGenerator` | `IInitializable` | Places stations on graph nodes, builds connection MST + light polygons |
@@ -75,7 +75,7 @@ Besides the terrain itself (cells/tiles, biomes), the PUNK world is populated by
 ## Classes
 
 ### Station : MonoBehaviour : SavableComponent<Station.Data>
-**Purpose:** Runtime behaviour of a space station — unlocking (first upgrade), shopping, upgrade installation, and the hatch animation.
+**Purpose:** Runtime behavior of a space station — unlocking (first upgrade), shopping, upgrade installation, and the hatch animation.
 
 **Key fields:** `StationUpgrade[] upgrades`, `Shop shop`, `GameObject unlockPrompt`, `GameObject shopPrompt`, `StationPlatform platform`, `Collider2D interactionCollider`, `EnemyTrackingSystem enemyTrackingSystem`, `bool emitDistressWhenLocked`, `GameObject enemyCollider`.
 
@@ -265,7 +265,7 @@ Biome asset (`Punk/Level/Biom`). Relevant to this category because it owns the c
 ## Modding Notes
 
 ### General architecture for patchers
-- Entity content is split into **data** (`EntityData` + `ComponentData` subclasses, e.g. `Station.Data`) and **view** (`SavableEntity` prefab + `SavableComponent<T>`). Patch the data layer to change persistent state; patch the MonoBehaviours to change behaviour/visuals.
+- Entity content is split into **data** (`EntityData` + `ComponentData` subclasses, e.g. `Station.Data`) and **view** (`SavableEntity` prefab + `SavableComponent<T>`). Patch the data layer to change persistent state; patch the MonoBehaviours to change behavior/visuals.
 - Most generation classes are resolved through a `ServiceLocator`. Useful runtime entry points: `ServiceLocator.Get<EntityManager>()` (then `GetEntitiesWithComponent<Station.Data>()`, `GetEntity(id)`, `GetAllEntities()`), `ServiceLocator.Get<PoIRegistry>()`, `ServiceLocator.Get<LevelGeneratorConfig>()`.
 
 ### More stations / POIs
@@ -288,7 +288,7 @@ Biome asset (`Punk/Level/Biom`). Relevant to this category because it owns the c
 - Plant shaking/physics (`EntityPlantFruit.Shake`, `PlantBranchVisualBase.Shake`, `PlantFruit`) are all managed MonoBehaviours, easy to patch for custom interaction effects.
 
 ### Burst job flag (IMPORTANT)
-The following are `[BurstCompile] IJob` structs — they are compiled to native code at build time, so **Harmony cannot patch their `Execute`/helper methods reliably** (Harmony patches managed IL; Burst-compiled jobs run native code). To alter their behaviour, instead patch the **managed scheduling method** that fills their inputs, or replace the inputs:
+The following are `[BurstCompile] IJob` structs — they are compiled to native code at build time, so **Harmony cannot patch their `Execute`/helper methods reliably** (Harmony patches managed IL; Burst-compiled jobs run native code). To alter their behavior, instead patch the **managed scheduling method** that fills their inputs, or replace the inputs:
 - `PoIGenerator.PoIGeneratorJob` — patch `PoIGenerator.PlacePoIs`.
 - `PlantGeneratorJob` — patch `PlantGenerator.GenerateTileBasedPlants`.
 - `EntityPlantGeneratorJob` — patch `PlantGenerator.GenerateEntityPlants`.

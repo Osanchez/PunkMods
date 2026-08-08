@@ -10,7 +10,7 @@ This document covers three subsystems of PUNK that mods most often want to touch
 
 - **Camera** — The game uses the third-party **ProCamera2D** asset (`Com.LuisPedroFonseca.ProCamera2D`) as the actual camera driver. PUNK adds its own *camera targets* (`CameraTargetBase` subclasses + `POICameraTarget`) that register virtual follow points with ProCamera2D, an `EnemyTrackingCamera` turret-style tracker, a debug `FreeMoveCamera` fast-travel tool, and shake helpers (`ShipCameraShaker`, `ShakeOnStart`, `ObjectShaker`) that mostly forward to `ProCamera2DShake.Instance`. Zoom is implemented as movement along the camera's local Z (perspective camera), via `CameraExtentions`.
 
-- **URP rendering & FX** — Custom **ScriptableRendererFeature / ScriptableRenderPass** classes implement a screen-space fog system: `FogRendererFeature` enqueues `FogMaskRenderPass` (renders Fog-layer geometry into `_FogMaskTexture`), `BlurFogMaskPass` (two-pass separable blur) and `RenderFogPass` (final blit). `FogManager` is the gameplay/simulation side: it runs a Burst job to spread fog across the level grid and feeds compute buffers (`_FogBuffer`, `_FogTypes`) and globals to the fog shaders. Lighting uses URP `Light2D` (`LightShapeBuilder`, `StationLightSource`, `BlinkingLight`, `LightSensor`). Outlines are generated at level-gen time (`OutlineFinder`/`OutlineGenerator`/`Outline`). Plus a set of small particle-driver behaviours and two tilemap renderers.
+- **URP rendering & FX** — Custom **ScriptableRendererFeature / ScriptableRenderPass** classes implement a screen-space fog system: `FogRendererFeature` enqueues `FogMaskRenderPass` (renders Fog-layer geometry into `_FogMaskTexture`), `BlurFogMaskPass` (two-pass separable blur) and `RenderFogPass` (final blit). `FogManager` is the gameplay/simulation side: it runs a Burst job to spread fog across the level grid and feeds compute buffers (`_FogBuffer`, `_FogTypes`) and globals to the fog shaders. Lighting uses URP `Light2D` (`LightShapeBuilder`, `StationLightSource`, `BlinkingLight`, `LightSensor`). Outlines are generated at level-gen time (`OutlineFinder`/`OutlineGenerator`/`Outline`). Plus a set of small particle-driver behaviors and two tilemap renderers.
 
 > Many shader/material parameters are global (`Shader.SetGlobalBuffer`/`SetGlobalVector`/`SetGlobalInt`), so they can be overridden at runtime from a mod without touching the originating component.
 
@@ -312,7 +312,7 @@ The fog effect is split into a **simulation** half (`FogManager`/`FogSource`, CP
 
 Small `MonoBehaviour`s that start/stop a `ParticleSystem` based on ship/physics state. None expose much public API; they are listed for completeness and as patch targets.
 
-| Class | Trigger / behaviour | Notable fields |
+| Class | Trigger / behavior | Notable fields |
 |---|---|---|
 | `DashParticle` | Plays on `ShipMovement.DashStarted`, stops after `duration` | `ShipMovement ship`, `float duration` |
 | `EngineParticle` | Plays while `ship.flyDirection` aligns (<60°) with `transform.up` | `ShipMovement ship` |

@@ -196,7 +196,7 @@ Damage/health flows through `DamagableResource` (a separate subsystem) whose `on
 
 ### Crawler
 - Kind: MonoBehaviour
-- Purpose: Boss/enemy-style many-legged crawler. Instantiates `legCount` `CrawlerLeg`s, raycasts in directions (toward `PushMovement.MovementDirection` or randomly when stopped) to place feet, forces a step after travelling `forceStepTravelDistance`.
+- Purpose: Boss/enemy-style many-legged crawler. Instantiates `legCount` `CrawlerLeg`s, raycasts in directions (toward `PushMovement.MovementDirection` or randomly when stopped) to place feet, forces a step after traveling `forceStepTravelDistance`.
 - Key fields (serialized): `rigidbody2D`, `legPrefab : CrawlerLeg`, `legCount : int`, `legLength`, `legMoveDuration`, `forceStepTravelDistance : float`, `movement : PushMovement`, `stepDurationMultiplierAtFullSpeed`, `maxRigidbodySpeed : float`.
 - Relationships: `CrawlerLeg`, `PushMovement`, ground `LayerMask`.
 

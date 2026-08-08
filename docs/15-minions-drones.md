@@ -180,7 +180,7 @@ Two quirks that shape "feel":
 
 ### 3. StateMachine — orbit until an enemy is visible
 
-A minion's behaviour tree (a GameObject `StateMachine`, see `05-enemies-ai.md`) typically orbits the
+A minion's behavior tree (a GameObject `StateMachine`, see `05-enemies-ai.md`) typically orbits the
 owner via `MoveAroundOwnerAction` and transitions to chase/attack when `EnemyVisibleCondition` /
 `TargetVisibleCondition` fire. `OwnerIsWithinRangeCondition` can pull it back toward the player, so a
 drone may briefly disengage to re-tether. The concrete states/conditions are **serialized on the

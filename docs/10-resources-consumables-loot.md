@@ -158,7 +158,7 @@ Purpose: trigger volume that spawns `ResourcePickup`s for non-full units in rang
 ### ResourcePickup: Pickup
 Purpose: magnet pickup that charges a tank.
 - Key fields: `Resource resource`, `float amount`, `string pickupSfx`.
-- Overrides: `CanBePickUpBy(unit)` = `unit.HasTank(resource)`; `OnPickedUp(unit)` charges the tank and plays SFX; `CompareCollectors(...)` prioritises units missing/most-needing the resource, then by distance.
+- Overrides: `CanBePickUpBy(unit)` = `unit.HasTank(resource)`; `OnPickedUp(unit)` charges the tank and plays SFX; `CompareCollectors(...)` prioritizes units missing/most-needing the resource, then by distance.
 
 ### UnitResourceRechargeIndicator: MonoBehaviour
 Purpose: plays particles + looping SFX while `unit.ComponentData.IsResourceRecharging(resource)`. Fields: `Unit unit`, `Resource resource`, `ParticleSystem particle`, `string rechargeSfx`.

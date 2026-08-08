@@ -16,7 +16,7 @@ Key `Level` storage that the cell systems read and write (declared in `Level.cs`
 | `containingMergedCellRelativePosition` | `NativeArray<HalvedByte>` | which merged-cell (if any) owns this index |
 | `obstackles` | `NativeHashSet<int2>` | manual navmesh blockers |
 
-A `CellType` is a `ScriptableObject` (Odin `SerializedScriptableObject`) identified by a `byte id`. It carries **everything** designers tune for that material: collision, contact damage, fire constants (`fireThreshold`, `burnDuration`, `heatTransmission`, `fireSpreadVariance`, `fireOverheatSpreadInfluence`, `burntVariant`), shake settings, sprites, merged-cell distribution, drop table, and a `List<CellBehaviour>` of pluggable per-material behaviours.
+A `CellType` is a `ScriptableObject` (Odin `SerializedScriptableObject`) identified by a `byte id`. It carries **everything** designers tune for that material: collision, contact damage, fire constants (`fireThreshold`, `burnDuration`, `heatTransmission`, `fireSpreadVariance`, `fireOverheatSpreadInfluence`, `burntVariant`), shake settings, sprites, merged-cell distribution, drop table, and a `List<CellBehaviour>` of pluggable per-material behaviors.
 
 Mutation flows through `Level.SetCell(...)` / `Level.DestroyCell(...)`, which fire the `Level.CellChanged` event with a `CellChange` struct that includes a `changeSource` int. Sub-systems use sentinel `changeSource` constants to avoid reacting to their own writes (e.g. burning = `15324`, auto-pop = `1324`).
 
@@ -26,7 +26,7 @@ The sub-systems, grouped by how they update cells:
 - **Electricity** — `ElectricityManager` owns two `ElectricitySubSystem`s (Player/Enemy). Each schedules a Burst `ConductorConnectionJob` to build a graph of beams between `ElectricityConductor`s, then deals damage to `IElectricityListener`s. This is conductor/object based, **not** grid based.
 - **Drag / Damage** — `DragCellBehaviour` and `DamageCellBehaviour` are `CellBehaviour`s read by per-unit `*Target` MonoBehaviours via a `ContainingCellPoller`; they slow or hurt whatever stands in that cell type.
 - **Regrow** — `CellRegrower` (MonoBehaviour) listens to `CellChanged`, and after a delay re-grows destroyed cells that carry a `CellRegrowBehaviour`, provided a matching neighbour exists.
-- **Auto-pop** — `AutoPopper` chain-destroys neighbouring cells of types listed in an `AutoPopNeighbour` behaviour when a cell is destroyed.
+- **Auto-pop** — `AutoPopper` chain-destroys neighbouring cells of types listed in an `AutoPopNeighbour` behavior when a cell is destroyed.
 - **Merging** — `MergedCellsGenerator` (generation-time) stamps multi-tile `MergedCellData` sprites onto contiguous same-type regions for visual variety.
 
 ## Class Index
@@ -34,10 +34,10 @@ The sub-systems, grouped by how they update cells:
 | Class | Kind | Role |
 | --- | --- | --- |
 | `Cell` | plain class | Per-position record (height, luminosity, type layers, position). Not the live grid. |
-| `CellType` | `SerializedScriptableObject` (`IDamagable`, `IIdentifiable<byte>`) | Material definition + all tunable constants + behaviour list. |
+| `CellType` | `SerializedScriptableObject` (`IDamagable`, `IIdentifiable<byte>`) | Material definition + all tunable constants + behavior list. |
 | `CellCollision` | struct | Payload describing a collision between a body and a cell. |
 | `ICellCollisionListener` | interface | `OnCellCollision(CellCollision)`. |
-| `CellBehaviour` | abstract class | Base for pluggable per-`CellType` behaviours. |
+| `CellBehaviour` | abstract class | Base for pluggable per-`CellType` behaviors. |
 | `BurnCellBehaviour` | `CellBehaviour` | `burnPerSecond` applied to units in this cell. |
 | `DamageCellBehaviour` | `CellBehaviour` | `Damage` + `delay` applied to units in this cell. |
 | `DragCellBehaviour` | `CellBehaviour` | velocity `drag` multiplier for bodies in this cell. |
@@ -88,7 +88,7 @@ The sub-systems, grouped by how they update cells:
 - **Collision / damage:** `DamageConditions damageConditions`; `Damage contactDamage`; `float contactPushbackForce`; `ColliderType colliderType` (enum `NonTrigger/Trigger/None`); `bool blocksEnemyPlacement` (default true); `bool isWalkable`; `bool ignoredByDepthMap`; `int navmeshTagId`.
 - **Fire constants:** `float fireThreshold` (heat needed to ignite; `<= 0` means non-flammable), `float burnDuration` (time on fire before consumed), `float heatTransmission` (how readily it accepts heat from neighbours), `float fireSpreadVariance` (Perlin-noise jitter on spread), `float fireOverheatSpreadInfluence` (extra spread from overheating), `CellType burntVariant` (what it becomes when burnt; null = destroyed).
 - **Visual / merge:** `Material tileMaterial`; `AnimationCurve tileBrightnessCurve`; `SpriteDistribution sprites`; `TileDistribution tiles`; `bool randomizeRotation/randomizeMirror`; `float mergedCellProbability`; `MergedCellDataDistribution mergedCells`; `ShakeSettings shakeSettings`; particles `impactParticle`/`destroyParticle`; `string destroySfx`, `hudAnimParamName`.
-- **Behaviours:** `List<CellBehaviour> cellBehaviours` — the pluggable per-material behaviour list (burn/damage/drag/regrow/auto-pop).
+- **Behaviours:** `List<CellBehaviour> cellBehaviours` — the pluggable per-material behavior list (burn/damage/drag/regrow/auto-pop).
 - **Drops:** `DropTable dropTable`.
 - **Nested:** `struct ShakeSettings { float stiffness, offsetLimit, propagationDamping, propagationDelay, frequency, shakeDuration; bool randomizeDirection; }`; `enum ColliderType { NonTrigger, Trigger, None }`.
 - **Key methods:** `byte Id => id`; `float GetDamageAmount(Damage damage)` returns `damage.amount` only if `damageConditions.Validate(damage)`.
@@ -101,7 +101,7 @@ The sub-systems, grouped by how they update cells:
 - `void OnCellCollision(CellCollision cellCollision)`.
 
 ### CellBehaviour: abstract class
-- **Purpose:** Empty abstract base. Concrete behaviours are data containers attached to a `CellType.cellBehaviours`. Consumers find them with `cellType.cellBehaviours[i] is XxxCellBehaviour`. Because they are plain serialized C# objects (not Burst), their fields **are** mod-friendly.
+- **Purpose:** Empty abstract base. Concrete behaviors are data containers attached to a `CellType.cellBehaviours`. Consumers find them with `cellType.cellBehaviours[i] is XxxCellBehaviour`. Because they are plain serialized C# objects (not Burst), their fields **are** mod-friendly.
 
 ### BurnCellBehaviour: CellBehaviour
 - **Field:** `float burnPerSecond` — burn rate applied to a unit standing on this material.
@@ -135,7 +135,7 @@ The sub-systems, grouped by how they update cells:
 - **Flow:** every `FixedUpdate`, if in a drag cell, `rigidbody.linearVelocity *= 1 - drag`.
 
 ### ContainingCellPoller: MonoBehaviour
-- **Purpose:** The shared bridge that all `*Target` behaviours use. Tracks which cell a transform occupies and fires events on change. Disables itself if no `Level` service exists.
+- **Purpose:** The shared bridge that all `*Target` behaviors use. Tracks which cell a transform occupies and fires events on change. Disables itself if no `Level` service exists.
 - **Events:** `Action<CellType, CellType> ContainingCellTypeChanged`; `Action<Vector2Int, Vector2Int> CellPositionChanged`.
 - **Properties:** `Vector2Int CellPosition` (setter validates with `level.ContainsCell` and fires events); `CellType ContainingCellType`.
 - **Flow:** `Update` sets `CellPosition = RoundToInt(transform.position)`; `OnDisable` clears `ContainingCellType` to null.
@@ -160,7 +160,7 @@ The sub-systems, grouped by how they update cells:
 - **Flow:** subscribes to `Level.CellChanged`. On a destruction *not* caused by burning (`changeSource != 15324`) where the previous type is regrowable, queues an entry with `regrowTime = Time.time + delay.RandomInRange()`. Each `Update`, if a matching neighbour exists and `regrowTime` passed, calls `Regrow` (`level.SetCell(index, cellType)`) and plays a slide-in `CellAnimationClip` via `tilemapAnimator`; otherwise pushes `regrowTime` out by `spread`.
 
 ### CellRegrowJob: MonoBehaviour
-- **Purpose:** Empty stub in the decompile (`Start`/`Update` empty). Despite the name it is **not** a Burst job. No behaviour to mod.
+- **Purpose:** Empty stub in the decompile (`Start`/`Update` empty). Despite the name it is **not** a Burst job. No behavior to mod.
 
 ### AutoPopper: MonoBehaviour
 - **Purpose:** Chain-destruction. When a cell with `AutoPopNeighbour` is destroyed, neighbouring matching cells "pop" after a delay, cascading outward with decreasing probability.
@@ -240,7 +240,7 @@ The sub-systems, grouped by how they update cells:
 ### CellInfoManager: MonoBehaviour
 - **Purpose:** Debug overlay spawning a `CellDebugInfo` label per visible non-empty cell, showing either cell type id or burn level.
 - **Nested:** `enum ValueToDebug { CellType, BurnLevel }`.
-- **Flow:** subscribes to `Level.CellChanged`, tilemap visibility events, and `CellBurningManager.BurnLevelsUpdated`. `GetBurnText` colours the number orange once `burnLevel >= fireThreshold`.
+- **Flow:** subscribes to `Level.CellChanged`, tilemap visibility events, and `CellBurningManager.BurnLevelsUpdated`. `GetBurnText` colors the number orange once `burnLevel >= fireThreshold`.
 
 ### CellDebugInfo: MonoBehaviour
 - One TMP label: `void Display(string label)`.
@@ -286,7 +286,7 @@ Almost all cell tuning is **data on ScriptableObjects**, which is the cleanest t
 - `ConductorConnectionJob` is invoked from `ElectricitySubSystem.Recalculate`; patch `Recalculate`/`DealDamages` (managed) rather than the job.
 
 ### Burst-compiled — CANNOT be Harmony/IL-patched
-The following are `[BurstCompile] IJob` structs. Once Burst compiles them to native code, their `Execute` bodies are **not** managed IL and **cannot be patched with Harmony**. To change their behaviour you must either change the managed inputs/fields they read, or (heavy-handed) disable Burst so the safe-managed fallback runs.
+The following are `[BurstCompile] IJob` structs. Once Burst compiles them to native code, their `Execute` bodies are **not** managed IL and **cannot be patched with Harmony**. To change their behavior you must either change the managed inputs/fields they read, or (heavy-handed) disable Burst so the safe-managed fallback runs.
 
 - **`BurningUpdateJob`** — the actual fire-diffusion math (heat transfer, the `0.7071` diagonal factor, Perlin variance, burnt detection). To tune fire, change the `CellType` fire constants that feed `CellBurningManager`'s native maps; you cannot rewrite the diffusion formula via Harmony.
 - **`ConductorConnectionJob`** — the electricity graph build (range checks, chain recursion, group merging, crossing rejection). Tune via `ElectricityConductor`/`ElectricityManager` fields (`beamRange`, `chainLength`, `conductivity`, `minConductivity`); the connection algorithm itself is native.
