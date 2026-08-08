@@ -44,7 +44,7 @@ if (-not $projects) { throw "No .csproj projects found under $ModsDir" }
 
 # 1b) Validate each distributed mod's mod.json before anything is built or packaged.
 # PUNK Nexus gates installs on an exact gameVersion match and reads the installed version out of
-# this file, so a missing, mislabelled or stale manifest ships a mod the client will refuse or
+# this file, so a missing, mislabeled or stale manifest ships a mod the client will refuse or
 # misreport. Failing here is much cheaper than failing on a user's machine.
 function Test-ModManifest($project) {
     $name = $project.BaseName
@@ -92,8 +92,8 @@ foreach ($p in $projects) {
     if ($err) { $manifestErrors += $err }
 }
 if ($manifestErrors) {
-    Write-Host "`
-mod.json validation failed:" -ForegroundColor Red
+    Write-Host ""
+    Write-Host "mod.json validation failed:" -ForegroundColor Red
     $manifestErrors | ForEach-Object { Write-Host "  - $_" -ForegroundColor Red }
     throw "Fix the mod.json problems above before packaging."
 }
