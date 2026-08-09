@@ -4,7 +4,7 @@
   "name": "Player Highlight",
   "author": "Trihardest",
   "version": "2.0.0",
-  "gameVersion": "0.12.10",
+  "gameVersion": "0.12.11",
   "description": "Draws a neon ring and a P1–P4 label around each player's ship so you can spot yourself quickly.",
   "category": "Quality of Life",
   "iconUrl": null,

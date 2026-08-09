@@ -4,7 +4,7 @@
   "name": "Mods Menu",
   "author": "Trihardest",
   "version": "2.1.0",
-  "gameVersion": "0.12.10",
+  "gameVersion": "0.12.11",
   "description": "Framework that adds a MODS tab to Settings; other mods register toggles, lists, and buttons into it. On its own it shows nothing — the tab only appears once another mod registers a row.",
   "category": "Framework",
   "iconUrl": null,

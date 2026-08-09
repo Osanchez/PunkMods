@@ -4,7 +4,7 @@
   "name": "Revive Item",
   "author": "Trihardest",
   "version": "1.0.0",
-  "gameVersion": "0.12.10",
+  "gameVersion": "0.12.11",
   "description": "Adds the Revive Beacon, a 2500-coin shop consumable that revives a random downed player at the user's position.",
   "category": "Co-op",
   "iconUrl": null,

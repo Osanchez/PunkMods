@@ -4,7 +4,7 @@
   "name": "Scoreboard",
   "author": "Trihardest",
   "version": "1.1.0",
-  "gameVersion": "0.12.10",
+  "gameVersion": "0.12.11",
   "description": "Hold Tab for a co-op scoreboard — per-player kills, bosses, deaths, damage dealt, time alive, HP, and fuel.",
   "category": "Co-op",
   "iconUrl": null,

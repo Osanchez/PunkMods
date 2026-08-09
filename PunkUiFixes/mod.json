@@ -4,7 +4,7 @@
   "name": "UI Fixes",
   "author": "Trihardest",
   "version": "1.0.0",
-  "gameVersion": "0.12.10",
+  "gameVersion": "0.12.11",
   "description": "Fixes vanilla UI alignment, e.g. the co-op ASSIGN INPUT header drifting on ultrawide aspect ratios.",
   "category": "Quality of Life",
   "iconUrl": null,

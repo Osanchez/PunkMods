@@ -4,7 +4,7 @@
   "name": "Input Tweaks",
   "author": "Trihardest",
   "version": "1.0.0",
-  "gameVersion": "0.12.10",
+  "gameVersion": "0.12.11",
   "description": "Raises the Input System polling rate to cut gamepad input latency (helps controller and Remote Play players).",
   "category": "Quality of Life",
   "iconUrl": null,
