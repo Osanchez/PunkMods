@@ -23,7 +23,7 @@ against the LATEST release. The second form cannot carry a checksum, because the
 points at is allowed to change underneath it.
 
 That matters here because every push rebuilds every zip, and the zips are not
-reproducible — Compress-Archive stamps timestamps, so identical source produces different
+reproducible - Compress-Archive stamps timestamps, so identical source produces different
 bytes each run. Verified by downloading BepInEx-Setup.zip from two consecutive releases
 whose content had not changed:
 
@@ -35,7 +35,7 @@ follows another. PUNK Nexus BLOCKS an install on a mismatch, which turns a worki
 into an uninstallable one.
 
 Pinning both together removes the contradiction. During a build the manifests still name
-the PREVIOUS release and its hash — an immutable asset that GitHub keeps forever — so the
+the PREVIOUS release and its hash - an immutable asset that GitHub keeps forever - so the
 catalog is never inconsistent, it just lags by the length of one CI job.
 """
 
@@ -47,6 +47,11 @@ import json
 import sys
 import urllib.request
 from pathlib import Path
+
+# CI runs this on windows-latest, where Python's stdout defaults to cp1252 and any non-ASCII
+# character raises UnicodeEncodeError mid-print. Force UTF-8 so output can never fail the build.
+if hasattr(sys.stdout, "reconfigure"):
+    sys.stdout.reconfigure(encoding="utf-8", errors="replace")
 
 REPO = "Osanchez/PunkMods"
 ROOT = Path(__file__).resolve().parent.parent
@@ -110,12 +115,12 @@ def main() -> int:
             print("--dist needs --tag (the release the zips will be published under)")
             return 2
         targets = targets_from_dist(args.dist, tag)
-        source = f"{args.dist} → {tag}"
+        source = f"{args.dist} -> {tag}"
     else:
         tag, targets = targets_from_release(tag)
         source = tag
 
-    print(f"pinning against {source} — {len(targets)} asset(s)\n")
+    print(f"pinning against {source} - {len(targets)} asset(s)\n")
 
     changed, problems = [], []
 
@@ -145,7 +150,7 @@ def main() -> int:
         manifest["sha256"] = sha
         manifest_path.write_text(json.dumps(manifest, indent=2) + "\n", encoding="utf-8")
         changed.append(mod_id)
-        print(f"  + {mod_id:<28} {sha[:16]}…")
+        print(f"  + {mod_id:<28} {sha[:16]}...")
 
     print()
     if problems:
