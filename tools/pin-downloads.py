@@ -1,37 +1,48 @@
 #!/usr/bin/env python3
-"""Pin every mod.json download to a specific release, with its sha256.
+"""Point every mod.json at one specific release asset, and publish that file's sha256.
 
-    python3 tools/pin-downloads.py                  # newest release
-    python3 tools/pin-downloads.py v2026.08.09.16   # a specific one
-    python3 tools/pin-downloads.py --check          # verify, change nothing (CI-friendly)
+CI runs this automatically after each build (see .github/workflows), so the catalog's
+checksums track every release without anyone remembering to refresh them. The manual
+forms are for fixing things up by hand:
 
-WHY PINNING AND HASHING GO TOGETHER
------------------------------------
-A mod.json may point at its download either as a fixed `url`, or as `repo` +
-`assetPattern` resolved against the LATEST release. The second form is convenient — a
-new release is picked up with no manifest edit — but it cannot carry a `sha256`.
+    python3 tools/pin-downloads.py                          # newest release, via the API
+    python3 tools/pin-downloads.py v2026.08.09.16           # a specific release, via the API
+    python3 tools/pin-downloads.py --dist dist --tag v1.2.3 # hash local zips (what CI uses)
+    python3 tools/pin-downloads.py --check                  # verify only, no writes
 
-This pipeline rebuilds every zip on every push to main, and the zips are not
-reproducible: Compress-Archive stamps file timestamps, so identical source produces a
-different archive every run. Verified by downloading BepInEx-Setup.zip from two
-consecutive releases whose content had not changed —
+WHAT THE HASH IS FOR
+--------------------
+It pins the identity of a *published artifact*. Once a zip is on a release, the manifest
+says "this exact file and no other", so a file swapped at the download URL after the fact
+is caught and refused rather than installed. That is the whole job.
+
+WHY THE URL IS PINNED TOO
+-------------------------
+A mod.json may name its download as a fixed `url`, or as `repo` + `assetPattern` resolved
+against the LATEST release. The second form cannot carry a checksum, because the thing it
+points at is allowed to change underneath it.
+
+That matters here because every push rebuilds every zip, and the zips are not
+reproducible — Compress-Archive stamps timestamps, so identical source produces different
+bytes each run. Verified by downloading BepInEx-Setup.zip from two consecutive releases
+whose content had not changed:
 
     v2026.08.08.14  76a3070fb99fe762581f9c92b081682df4a979e4644ccce0a81c4143c76f656a
     v2026.08.09.16  5f530a14d08301b18f1b6784a1e0d4c953c069e9b0e1db346471cd2ef96ed040
 
-So a hash written against "latest" is wrong the moment anything is pushed. PUNK Nexus
-BLOCKS an install on a hash mismatch, which means a stale hash is strictly worse than
-no hash at all: it takes a working mod and makes it uninstallable.
+So "latest" plus a hash is a contradiction: the hash names one build while the pointer
+follows another. PUNK Nexus BLOCKS an install on a mismatch, which turns a working mod
+into an uninstallable one.
 
-Pinning the url removes the moving part. The manifest then names one immutable artifact
-and the hash of exactly that artifact, and both stay true until someone deliberately
-moves them — which is the same edit as bumping `version`, so it costs a release nothing.
-
-Run this after a release when you actually want the catalog to serve it.
+Pinning both together removes the contradiction. During a build the manifests still name
+the PREVIOUS release and its hash — an immutable asset that GitHub keeps forever — so the
+catalog is never inconsistent, it just lags by the length of one CI job.
 """
 
 from __future__ import annotations
 
+import argparse
+import hashlib
 import json
 import sys
 import urllib.request
@@ -51,20 +62,60 @@ def fetch(url: str):
         return json.load(r)
 
 
-def release(tag: str | None):
-    if tag:
-        return fetch(f"{API}/repos/{REPO}/releases/tags/{tag}")
-    return fetch(f"{API}/repos/{REPO}/releases/latest")
+def asset_url(tag: str, name: str) -> str:
+    """Release asset URLs are formed the same way every time, so a local run needs no API."""
+    return f"https://github.com/{REPO}/releases/download/{tag}/{name}"
+
+
+def sha256_of(path: Path) -> str:
+    h = hashlib.sha256()
+    with path.open("rb") as f:
+        for chunk in iter(lambda: f.read(1 << 20), b""):
+            h.update(chunk)
+    return h.hexdigest()
+
+
+def targets_from_dist(dist: Path, tag: str) -> dict[str, tuple[str, str]]:
+    """{asset name: (url, sha256)} hashed from the zips this build just produced."""
+    out = {}
+    for zip_path in sorted(dist.glob("*.zip")):
+        out[zip_path.name] = (asset_url(tag, zip_path.name), sha256_of(zip_path))
+    return out
+
+
+def targets_from_release(tag: str | None) -> tuple[str, dict[str, tuple[str, str]]]:
+    """{asset name: (url, sha256)} taken from the digests GitHub computed on upload."""
+    rel = fetch(f"{API}/repos/{REPO}/releases/tags/{tag}" if tag
+                else f"{API}/repos/{REPO}/releases/latest")
+    out = {}
+    for a in rel["assets"]:
+        digest = a.get("digest") or ""
+        if digest.startswith("sha256:"):
+            out[a["name"]] = (a["browser_download_url"], digest.split(":", 1)[1])
+    return rel["tag_name"], out
 
 
 def main() -> int:
-    args = [a for a in sys.argv[1:]]
-    check_only = "--check" in args
-    tag = next((a for a in args if not a.startswith("-")), None)
+    ap = argparse.ArgumentParser(description=__doc__)
+    ap.add_argument("tag_positional", nargs="?", metavar="TAG")
+    ap.add_argument("--tag")
+    ap.add_argument("--dist", type=Path, help="hash these local zips instead of calling the API")
+    ap.add_argument("--check", action="store_true", help="report drift, write nothing")
+    args = ap.parse_args()
 
-    rel = release(tag)
-    assets = {a["name"]: a for a in rel["assets"]}
-    print(f"release {rel['tag_name']} — {len(assets)} assets\n")
+    tag = args.tag or args.tag_positional
+
+    if args.dist:
+        if not tag:
+            print("--dist needs --tag (the release the zips will be published under)")
+            return 2
+        targets = targets_from_dist(args.dist, tag)
+        source = f"{args.dist} → {tag}"
+    else:
+        tag, targets = targets_from_release(tag)
+        source = tag
+
+    print(f"pinning against {source} — {len(targets)} asset(s)\n")
 
     changed, problems = [], []
 
@@ -73,29 +124,21 @@ def main() -> int:
         mod_id, version = manifest.get("id"), manifest.get("version")
         expected = f"{mod_id}-v{version}.zip"
 
-        asset = assets.get(expected)
-        if asset is None:
-            # Not every folder is distributed, and a version bump that has not been
-            # released yet is a normal in-between state, not a failure to fix here.
-            problems.append(f"{mod_id}: no asset named {expected} in {rel['tag_name']}")
+        target = targets.get(expected)
+        if target is None:
+            # A folder that is not distributed, or a version bumped but not yet released, is a
+            # normal in-between state rather than something to fix here.
+            problems.append(f"{mod_id}: no asset named {expected}")
             continue
 
-        # GitHub reports the digest it computed on upload, so the bytes never have to be
-        # downloaded to be pinned. Format is "sha256:<hex>".
-        digest = (asset.get("digest") or "")
-        if not digest.startswith("sha256:"):
-            problems.append(f"{mod_id}: release asset carries no sha256 digest")
-            continue
-        sha = digest.split(":", 1)[1]
-
-        url = asset["browser_download_url"]
+        url, sha = target
         current = manifest.get("download") or {}
         if current.get("url") == url and manifest.get("sha256") == sha:
             print(f"  = {mod_id:<28} already pinned")
             continue
 
-        if check_only:
-            problems.append(f"{mod_id}: not pinned to {rel['tag_name']}")
+        if args.check:
+            problems.append(f"{mod_id}: not pinned to {tag}")
             continue
 
         manifest["download"] = {"url": url}
@@ -109,10 +152,11 @@ def main() -> int:
         print("problems:")
         for p in problems:
             print(f"  - {p}")
-    if check_only:
+
+    if args.check:
         return 1 if problems else 0
 
-    print(f"pinned {len(changed)} manifest(s) to {rel['tag_name']}")
+    print(f"pinned {len(changed)} manifest(s) to {tag}")
     return 1 if problems else 0
 
 

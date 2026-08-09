@@ -26,6 +26,9 @@ jobs:
     steps:
       - name: Checkout
         uses: actions/checkout@v4
+        # The pinning step below commits back to main, which needs the credentials kept.
+        with:
+          persist-credentials: true
 
       - name: Setup .NET SDK
         uses: actions/setup-dotnet@v4
@@ -80,3 +83,34 @@ jobs:
           generate_release_notes: true
           append_body: true       # keep the auto-generated notes; add our blurb after them
           body: ${{ steps.blurb.outputs.blurb }}
+
+      # Checksums have to be a POST-BUILD step, because the thing being hashed is the artifact
+      # this run just produced. Its whole job is to pin the identity of a published file, so that
+      # a zip swapped at the download URL afterwards is refused instead of installed.
+      #
+      # The download url is pinned along with it. "Latest release" plus a hash is a contradiction —
+      # the hash names one build while the pointer follows another — and the client BLOCKS an
+      # install on a mismatch. Until this step lands, the manifests still name the PREVIOUS
+      # release and its hash, which GitHub keeps forever, so the catalog is never inconsistent;
+      # it only lags by the length of this job.
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.x'
+
+      - name: Pin downloads and checksums to this release
+        shell: pwsh
+        run: |
+          python tools/pin-downloads.py --dist dist --tag '${{ steps.ver.outputs.tag }}'
+          if ($LASTEXITCODE -ne 0) { throw "pin-downloads failed." }
+
+          git config user.name  'github-actions[bot]'
+          git config user.email 'github-actions[bot]@users.noreply.github.com'
+          git add */mod.json
+          if (git diff --cached --quiet) {
+            Write-Host 'Manifests already pinned to this release; nothing to commit.'
+            exit 0
+          }
+          # [skip ci] is essential: this pushes to main, and main is what triggers this workflow.
+          git commit -m 'ci: pin downloads to ${{ steps.ver.outputs.tag }} [skip ci]'
+          git push origin HEAD:main

@@ -69,37 +69,45 @@ version must be captured here). To refresh it on its own: `powershell -File tool
   `game-version.json`, which CI turns into the Release-description blurb.
 - `tools/update-refs.ps1` — make-refs + get-game-version + upload to the private refs release.
 
-## Pinned downloads and checksums (`tools/pin-downloads.py`)
+## Pinned downloads and checksums
 
-Each `mod.json` names the exact release asset PUNK Nexus should download, plus that file's
-`sha256`. After a release you want the catalog to actually serve, run:
+Every `mod.json` names the exact release asset PUNK Nexus should download, plus that file's
+`sha256`. **CI does this for you** — the `Pin downloads and checksums` step runs after the release
+is published, hashes the zips this run produced, writes them into the manifests, and commits back to
+`main` with `[skip ci]`.
+
+The point of the hash is to pin the identity of a *published artifact*: once a zip is on a release,
+the manifest says "this exact file and no other", so a file swapped at the download URL afterwards
+is refused rather than installed.
+
+You only need the tool by hand to repair drift:
 
 ```bash
-python3 tools/pin-downloads.py                  # newest release
-python3 tools/pin-downloads.py v2026.08.09.16   # a specific one
-python3 tools/pin-downloads.py --check          # verify only, no writes
+python3 tools/pin-downloads.py                          # newest release, via the API
+python3 tools/pin-downloads.py v2026.08.09.16           # a specific release
+python3 tools/pin-downloads.py --dist dist --tag v1.2.3 # hash local zips (what CI runs)
+python3 tools/pin-downloads.py --check                  # verify only, no writes
 ```
 
-Then commit the changed manifests.
-
-**Why pinned rather than "latest".** A manifest may point at its download as `repo` +
-`assetPattern` resolved against the newest release, which needs no edit per release — but it cannot
-carry a checksum. This pipeline rebuilds every zip on every push and the zips are **not
-reproducible**: `Compress-Archive` stamps timestamps, so identical source yields different bytes.
-Confirmed by pulling `BepInEx-Setup.zip` from two consecutive releases whose content had not
-changed:
+**Why the url is pinned as well as hashed.** A manifest may name its download as a fixed `url` or as
+`repo` + `assetPattern` resolved against the newest release. The second form cannot carry a
+checksum, because what it points at is allowed to change underneath it — and here it always does:
+every push rebuilds every zip, and the zips are not reproducible (`Compress-Archive` stamps
+timestamps). Confirmed by pulling `BepInEx-Setup.zip` from two consecutive releases whose content
+had not changed:
 
 ```
 v2026.08.08.14  76a3070fb99fe762581f9c92b081682df4a979e4644ccce0a81c4143c76f656a
 v2026.08.09.16  5f530a14d08301b18f1b6784a1e0d4c953c069e9b0e1db346471cd2ef96ed040
 ```
 
-So a hash written against "latest" is wrong as soon as anything is pushed — and the client
-**blocks an install on a hash mismatch**. A stale hash is therefore strictly worse than none: it
-turns a working mod into an uninstallable one. Pinning removes the moving part, and the manifest
-names one immutable artifact plus the hash of exactly that artifact.
+So "latest" plus a hash is a contradiction: the hash names one build while the pointer follows
+another. The client **blocks an install on a mismatch**, so that contradiction would turn working
+mods into uninstallable ones. Pinning both together removes it.
 
-**The consequence to remember:** the catalog now serves the pinned release until this is re-run.
-A rebuild that nobody pins changes nothing for players — which is the point, since a rebuild is
-not a new version of anything. When a mod genuinely changes, you are already editing its `mod.json`
-to bump `version`; re-running this in the same breath keeps the download and its hash honest.
+**There is no broken window during a build.** Until the pinning step lands, the manifests still name
+the *previous* release and its hash — an immutable asset GitHub keeps forever — so the catalog is
+always self-consistent. It just lags by the length of one CI job.
+
+**The `[skip ci]` marker is load-bearing.** That commit goes to `main`, and pushes to `main` are what
+trigger this workflow; without it the release loop never terminates.
