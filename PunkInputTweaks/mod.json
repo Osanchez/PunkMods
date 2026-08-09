@@ -15,8 +15,7 @@
   "pluginFolder": "PunkInputTweaks",
   "dependencies": [],
   "download": {
-    "repo": "Osanchez/PunkMods",
-    "assetPattern": "PunkInputTweaks-v*.zip"
+    "url": "https://github.com/Osanchez/PunkMods/releases/download/v2026.08.09.16/PunkInputTweaks-v1.0.0.zip"
   },
-  "sha256": null
+  "sha256": "bff8f12494b5a59132641b19fe26cb8a04ba9e7d32d37347962b204fcb54e00a"
 }

@@ -5,7 +5,7 @@
   "author": "Trihardest",
   "version": "0.2.1",
   "gameVersion": "0.12.11",
-  "description": "Local and Remote Play co-op for up to 4 players — dynamic join screen, extra ships and HUDs, and the ready-up profile picker.",
+  "description": "Local and Remote Play co-op for up to 4 players \u2014 dynamic join screen, extra ships and HUDs, and the ready-up profile picker.",
   "category": "Co-op",
   "iconUrl": null,
   "homepage": "https://github.com/Osanchez/PunkMods",
@@ -16,8 +16,7 @@
   "pluginFolder": "PunkFourPlayer",
   "dependencies": [],
   "download": {
-    "repo": "Osanchez/PunkMods",
-    "assetPattern": "PunkFourPlayer-v*.zip"
+    "url": "https://github.com/Osanchez/PunkMods/releases/download/v2026.08.09.16/PunkFourPlayer-v0.2.1.zip"
   },
-  "sha256": null
+  "sha256": "8d8de18d445b77bc79616ebc61b5bcd39a6150032269024596a1e056d82504b3"
 }

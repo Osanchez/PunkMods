@@ -15,8 +15,7 @@
   "pluginFolder": "PunkDebugKey",
   "dependencies": [],
   "download": {
-    "repo": "Osanchez/PunkMods",
-    "assetPattern": "PunkDebugKey-v*.zip"
+    "url": "https://github.com/Osanchez/PunkMods/releases/download/v2026.08.09.16/PunkDebugKey-v2.1.0.zip"
   },
-  "sha256": null
+  "sha256": "8e232a99ed7aebce11fc08467b18e6c90e808f923a1bfcae925f4f6b714e0cc3"
 }

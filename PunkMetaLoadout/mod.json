@@ -15,8 +15,7 @@
   "pluginFolder": "PunkMetaLoadout",
   "dependencies": [],
   "download": {
-    "repo": "Osanchez/PunkMods",
-    "assetPattern": "PunkMetaLoadout-v*.zip"
+    "url": "https://github.com/Osanchez/PunkMods/releases/download/v2026.08.09.16/PunkMetaLoadout-v2.0.0.zip"
   },
-  "sha256": null
+  "sha256": "f3b829320cccbb8a416b02834f7cc8511e913acf34292a092854fcbcfb2f1d57"
 }

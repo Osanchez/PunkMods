@@ -68,3 +68,38 @@ version must be captured here). To refresh it on its own: `powershell -File tool
   `Punk_Data\globalgamemanagers`) + Steam build id (from the Steam `appmanifest`) into the tracked
   `game-version.json`, which CI turns into the Release-description blurb.
 - `tools/update-refs.ps1` — make-refs + get-game-version + upload to the private refs release.
+
+## Pinned downloads and checksums (`tools/pin-downloads.py`)
+
+Each `mod.json` names the exact release asset PUNK Nexus should download, plus that file's
+`sha256`. After a release you want the catalog to actually serve, run:
+
+```bash
+python3 tools/pin-downloads.py                  # newest release
+python3 tools/pin-downloads.py v2026.08.09.16   # a specific one
+python3 tools/pin-downloads.py --check          # verify only, no writes
+```
+
+Then commit the changed manifests.
+
+**Why pinned rather than "latest".** A manifest may point at its download as `repo` +
+`assetPattern` resolved against the newest release, which needs no edit per release — but it cannot
+carry a checksum. This pipeline rebuilds every zip on every push and the zips are **not
+reproducible**: `Compress-Archive` stamps timestamps, so identical source yields different bytes.
+Confirmed by pulling `BepInEx-Setup.zip` from two consecutive releases whose content had not
+changed:
+
+```
+v2026.08.08.14  76a3070fb99fe762581f9c92b081682df4a979e4644ccce0a81c4143c76f656a
+v2026.08.09.16  5f530a14d08301b18f1b6784a1e0d4c953c069e9b0e1db346471cd2ef96ed040
+```
+
+So a hash written against "latest" is wrong as soon as anything is pushed — and the client
+**blocks an install on a hash mismatch**. A stale hash is therefore strictly worse than none: it
+turns a working mod into an uninstallable one. Pinning removes the moving part, and the manifest
+names one immutable artifact plus the hash of exactly that artifact.
+
+**The consequence to remember:** the catalog now serves the pinned release until this is re-run.
+A rebuild that nobody pins changes nothing for players — which is the point, since a rebuild is
+not a new version of anything. When a mod genuinely changes, you are already editing its `mod.json`
+to bump `version`; re-running this in the same breath keeps the download and its hash honest.

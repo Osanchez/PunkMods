@@ -15,8 +15,7 @@
   "pluginFolder": "PunkSeedPicker",
   "dependencies": [],
   "download": {
-    "repo": "Osanchez/PunkMods",
-    "assetPattern": "PunkSeedPicker-v*.zip"
+    "url": "https://github.com/Osanchez/PunkMods/releases/download/v2026.08.09.16/PunkSeedPicker-v1.0.0.zip"
   },
-  "sha256": null
+  "sha256": "ae8d4671016e7e2f7b28e79ac9155735eaeb847bace5ac833051e578a9fcabe3"
 }

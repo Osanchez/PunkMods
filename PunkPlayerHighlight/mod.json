@@ -5,7 +5,7 @@
   "author": "Trihardest",
   "version": "2.0.0",
   "gameVersion": "0.12.11",
-  "description": "Draws a neon ring and a P1–P4 label around each player's ship so you can spot yourself quickly.",
+  "description": "Draws a neon ring and a P1\u2013P4 label around each player's ship so you can spot yourself quickly.",
   "category": "Quality of Life",
   "iconUrl": null,
   "homepage": "https://github.com/Osanchez/PunkMods",
@@ -16,8 +16,7 @@
   "pluginFolder": "PunkPlayerHighlight",
   "dependencies": [],
   "download": {
-    "repo": "Osanchez/PunkMods",
-    "assetPattern": "PunkPlayerHighlight-v*.zip"
+    "url": "https://github.com/Osanchez/PunkMods/releases/download/v2026.08.09.16/PunkPlayerHighlight-v2.0.0.zip"
   },
-  "sha256": null
+  "sha256": "8b73a4168300b2d6787d5b0fa8f1c0a72c21ddd0fd1d3c12484af7ef0917653e"
 }

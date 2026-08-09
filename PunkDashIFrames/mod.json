@@ -15,8 +15,7 @@
   "pluginFolder": "PunkDashIFrames",
   "dependencies": [],
   "download": {
-    "repo": "Osanchez/PunkMods",
-    "assetPattern": "PunkDashIFrames-v*.zip"
+    "url": "https://github.com/Osanchez/PunkMods/releases/download/v2026.08.09.16/PunkDashIFrames-v1.0.0.zip"
   },
-  "sha256": null
+  "sha256": "194c275a4dc37473379f23e44ff5cf67febe3a449460eb97d3649e4974595b79"
 }
