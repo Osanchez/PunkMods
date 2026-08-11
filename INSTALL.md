@@ -72,7 +72,7 @@ PUNK Playtest\                  <- game folder (where Punk.exe is)
    ├─ config\                   BepInEx's own config (not the mods')
    └─ plugins\                  THE MODS - one folder each
        ├─ PunkModsMenu\         (install the mods you want; one folder per mod)
-       ├─ PunkFourPlayer\       each mod folder gets its own config.cfg on first launch
+       ├─ PunkScoreboard\       each mod folder gets its own config.cfg on first launch
        └─ ...
 ```
 
@@ -84,7 +84,7 @@ Remove a single mod later by deleting its **folder** from `BepInEx\plugins\`.
   must be installed alongside at least one other mod for the tab to appear).
 - **Config files:** after the first launch, each mod writes a `config.cfg` into **its own folder**,
   `BepInEx\plugins\<Mod>\config.cfg`, pre‑filled with working defaults. Edit with a text editor and
-  relaunch (e.g. `BepInEx\plugins\PunkFourPlayer\config.cfg` → `PlayerCount`,
+  relaunch (e.g. `BepInEx\plugins\PunkScoreboard\config.cfg` → its own keys,
   `BepInEx\plugins\PunkInputTweaks\config.cfg` → `GamepadPollingHz`). Mods work out of the box with
   the defaults, with or without the MODS tab.
 

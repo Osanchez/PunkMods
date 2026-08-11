@@ -12,7 +12,7 @@
   "tags": [
     "combat"
   ],
-  "side": "both",
+  "side": "client",
   "pluginFolder": "PunkDashIFrames",
   "dependencies": [],
   "download": {

@@ -57,7 +57,6 @@ Local & Remote Play co‑op uses **controllers**: one keyboard/mouse player plus
 - **Debug Menu Key** — Opens the game's built-in developer debug menu with F1.
 
 ### Co-op
-- **Four Player** — Local + Remote Play co-op for up to 4 players: dynamic join screen, extra ships & HUDs, press-Start-to-join, the ready-up profile picker, one-player-per-slot, P3/P4 colors + rumble settings.
 - **Sim Controller** — Debug tool: emulate controllers from your keyboard/mouse to test co-op solo.
 - **Meta Loadout** — Persists each player's ship build per class and profile across runs; profiles are chosen on the player-select screen.
 - **Player Highlight** — Neon ring + P1–P4 label around each player's ship, tinted to that ship's color.
@@ -113,7 +112,7 @@ Rebuild a single mod and reload it in-game without restarting, via the in-repo *
 
 1. Stage the mod you're iterating on into `scripts/`:
    ```
-   powershell -File build-package.ps1 -HotReload PunkFourPlayer
+   powershell -File build-package.ps1 -HotReload PunkScoreboard
    ```
    This Debug-builds just that mod into `BepInEx/scripts/` and removes it from `plugins/` (so it isn't loaded twice).
 2. In-game, press the reload key (default **F10**, configurable in `BepInEx/config/com.osanchez.punk.devreload.cfg`) after each rebuild. PunkDevReload destroys the old instance — running its `OnDestroy` teardown — then loads the new build from bytes; a matching `.pdb` is loaded too, so breakpoints still hit.

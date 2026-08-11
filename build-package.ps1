@@ -20,7 +20,7 @@ param(
     # LOCAL DEV: build with symbols (Debug config) and deploy each mod's dll + .pdb to your local
     # BepInEx\plugins\ so a managed debugger (dnSpyEx / Rider) can step through source. No dist zip.
     [switch]$Debug,
-    # LOCAL DEV: Debug-build the named mod (e.g. -HotReload PunkFourPlayer) into BepInEx\scripts\ for
+    # LOCAL DEV: Debug-build the named mod (e.g. -HotReload PunkScoreboard) into BepInEx\scripts\ for
     # live reload via ScriptEngine (press F6 in-game). Also removes it from plugins\ to avoid a double-load.
     [string]$HotReload
 )

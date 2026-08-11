@@ -12,7 +12,7 @@
   "tags": [
     "world"
   ],
-  "side": "server",
+  "side": "client",
   "pluginFolder": "PunkSeedPicker",
   "dependencies": [],
   "download": {
