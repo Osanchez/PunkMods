@@ -13,6 +13,7 @@
     "combat",
     "drones"
   ],
+  "side": "both",
   "pluginFolder": "PunkDronesEnhanced",
   "dependencies": [
     "PunkModsMenu"

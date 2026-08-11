@@ -12,6 +12,7 @@
   "tags": [
     "economy"
   ],
+  "side": "both",
   "pluginFolder": "SellVaultItems",
   "dependencies": [],
   "download": {

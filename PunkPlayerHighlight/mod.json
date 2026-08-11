@@ -13,6 +13,7 @@
     "hud",
     "co-op"
   ],
+  "side": "client",
   "pluginFolder": "PunkPlayerHighlight",
   "dependencies": [],
   "download": {

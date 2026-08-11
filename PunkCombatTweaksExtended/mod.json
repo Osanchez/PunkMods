@@ -13,6 +13,7 @@
     "combat",
     "feel"
   ],
+  "side": "both",
   "pluginFolder": "PunkCombatTweaksExtended",
   "dependencies": [
     "PunkModsMenu"

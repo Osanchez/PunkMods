@@ -12,6 +12,7 @@
   "tags": [
     "developer"
   ],
+  "side": "client",
   "pluginFolder": "PunkSimController",
   "dependencies": [],
   "download": {

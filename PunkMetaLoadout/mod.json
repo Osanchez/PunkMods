@@ -12,6 +12,7 @@
   "tags": [
     "progression"
   ],
+  "side": "client",
   "pluginFolder": "PunkMetaLoadout",
   "dependencies": [],
   "download": {

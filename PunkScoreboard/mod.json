@@ -13,6 +13,7 @@
     "co-op",
     "hud"
   ],
+  "side": "client",
   "pluginFolder": "PunkScoreboard",
   "dependencies": [],
   "download": {

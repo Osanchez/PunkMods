@@ -12,6 +12,7 @@
   "tags": [
     "ui"
   ],
+  "side": "client",
   "pluginFolder": "PunkUiFixes",
   "dependencies": [],
   "download": {

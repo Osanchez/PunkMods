@@ -12,6 +12,7 @@
   "tags": [
     "input"
   ],
+  "side": "client",
   "pluginFolder": "PunkInputTweaks",
   "dependencies": [],
   "download": {
