@@ -27,6 +27,11 @@ namespace PunkMetaLoadout
             // 0 is the default so an older profiles.json (no keepMode key) reads back as Ship + Vault,
             // preserving the original behavior for existing users.
             public int keepMode = 0;
+            // The class the current save was STARTED with, per mode (the game keeps exactly one save
+            // slot each for solo and co-op). Continued runs carry no starting loadout, so this is the
+            // only way they can find the files they belong to — see MetaLoadout.ResolveRunClass.
+            public string lastClassSolo;
+            public string lastClassCoop;
         }
 
         private static Persist _data = new Persist();
@@ -157,6 +162,22 @@ namespace PunkMetaLoadout
             EnsureLoaded();
             v = Mathf.Clamp(v, 0, 2);
             if (_data.keepMode != v) { _data.keepMode = v; SaveMeta(); }
+        }
+
+        // ---- class the live save slot was started with (solo / co-op keep separate saves) ----
+        internal static string GetLastClass(bool coop)
+        {
+            EnsureLoaded();
+            return coop ? _data.lastClassCoop : _data.lastClassSolo;
+        }
+
+        internal static void SetLastClass(bool coop, string cls)
+        {
+            EnsureLoaded();
+            if (string.IsNullOrEmpty(cls)) return;
+            if (coop) { if (_data.lastClassCoop == cls) return; _data.lastClassCoop = cls; }
+            else      { if (_data.lastClassSolo == cls) return; _data.lastClassSolo = cls; }
+            SaveMeta();
         }
 
         // ---- per-profile build + shared per-class vault file paths ----

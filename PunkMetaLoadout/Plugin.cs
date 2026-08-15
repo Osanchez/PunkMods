@@ -5,6 +5,7 @@ using BepInEx;
 using BepInEx.Logging;
 using BepInEx.Unity.Mono;            // BepInEx 6 (Mono). For BepInEx 5, remove this line.
 using HarmonyLib;
+using Punk.SaveLoad;                 // GameSaver — the game's own save, which we mirror
 using Sirenix.Serialization;         // Odin — the game's own serializer; supports DataFormat.JSON
 using UnityEngine;
 
@@ -22,7 +23,7 @@ namespace PunkMetaLoadout
     {
         public const string Guid = "com.osanchez.punk.metaloadout";
         public const string Name = "PUNK Meta Loadout (persistent build)";
-        public const string Version = "2.0.0";
+        public const string Version = "2.1.0";
 
         internal static ManualLogSource Log;
         private Harmony _harmony;
@@ -62,7 +63,13 @@ namespace PunkMetaLoadout
 
         private static string _runClass = "default";
         private static bool _isContinue;
+        private static bool _isCoop;       // solo and co-op have separate save slots, so separate keys
         internal static bool Suppressed;   // set by ClearProgress; cleared on next run
+
+        // One .bak per file per game session, taken just before the first overwrite — a recovery
+        // point from the moment the game launched, for when a run goes wrong.
+        private static readonly HashSet<string> _backedUp = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+        private static bool _warnedOrphanDefault;
 
         // "Keep Across Runs" gates BOTH save and restore per component, so the non-selected side's JSON
         // is left untouched (frozen) instead of cleared — switch modes later and the old values are
@@ -107,6 +114,7 @@ namespace PunkMetaLoadout
             try
             {
                 if (_vault != null) { _vault.IngredientAmountChanged -= _ingH; _vault.ConsumableAmountChanged -= _conH; _vault = null; }
+                RestoredVault = null;   // else a reload's first run thinks it already restored
             }
             catch { }
         }
@@ -120,7 +128,8 @@ namespace PunkMetaLoadout
                 Suppressed = false;
                 var args = GameScene.arguments;
                 _isContinue = args.isContinue;
-                _runClass = Sanitize(args.startingLoadout != null ? args.startingLoadout.name : "default");
+                _isCoop = args.isCoop;
+                _runClass = ResolveRunClass(args);
 
                 var ships = ServiceLocator.Get<ShipManager>()?.Ships;
                 if (ships == null) return;
@@ -134,9 +143,56 @@ namespace PunkMetaLoadout
                 }
 
                 Resubscribe(ships);
-                SaveAll(ships);
+
+                // Deliberately NO save here. A restore that found nothing (missing file, unreadable
+                // file, wrong class key) leaves a fresh starting ship in place, and saving at this
+                // point would write that straight over a good file. Everything from here is saved by
+                // the change events below, by the game's own save, and by game over.
+                Plugin.Log.LogInfo($"Run ready — class '{_runClass}'{(_isContinue ? " (continue)" : "")}, " +
+                                   $"{ships.Count} ship(s). Saves under: {ProfileStore.Root}");
+                WarnAboutOrphanedDefault();
             }
             catch (Exception e) { Plugin.Log.LogWarning($"OnRunReady failed: {e}"); }
+        }
+
+        /// <summary>
+        /// The class key this run's files live under. Continue does NOT go through the loadout
+        /// selector — <c>GameScene.Continue</c> builds its arguments with <c>RunArguments.Continue</c>,
+        /// which never sets <c>startingLoadout</c> — so reading the loadout on a continued run yields
+        /// null and would file that run's whole progress under "default", stranding it away from the
+        /// class the save was actually started with. The class is recorded whenever the game writes
+        /// its save (see <see cref="OnGameSaved"/> — that's the save Continue will reload) and read
+        /// back here.
+        /// </summary>
+        private static string ResolveRunClass(RunArguments args)
+        {
+            // A new run with no starting loadout means GameController fell back to its own
+            // defaultLoadout, so "default" really is the right key there.
+            if (!args.isContinue)
+                return Sanitize(args.startingLoadout != null ? args.startingLoadout.name : "default");
+            var remembered = ProfileStore.GetLastClass(args.isCoop);
+            if (!string.IsNullOrEmpty(remembered)) return remembered;
+            Plugin.Log.LogWarning("Continuing a save that was started before this version — its class " +
+                                  "is unknown, so this run uses the 'default' files.");
+            return "default";
+        }
+
+        /// <summary>Continued runs saved by v2.0.0 and earlier landed in the "default" files. Point at
+        /// them once per session so stranded progress can be recovered instead of looking deleted.</summary>
+        private static void WarnAboutOrphanedDefault()
+        {
+            if (_warnedOrphanDefault || _runClass == "default") return;
+            _warnedOrphanDefault = true;
+            try
+            {
+                if (!File.Exists(ProfileStore.VaultFile("default"))) return;
+                Plugin.Log.LogWarning(
+                    $"Found 'default' saves in {ProfileStore.Root}. Versions before 2.1.0 filed continued " +
+                    $"runs there instead of under their class. If a build of yours is missing, copy " +
+                    $"vault_default.json over vault_{_runClass}.json (and profiles/<name>/default.json over " +
+                    $"profiles/<name>/{_runClass}.json) while the game is closed.");
+            }
+            catch { }
         }
 
         private static void RestoreShip(Ship ship, int slot)   // slot is 1-based
@@ -196,9 +252,8 @@ namespace PunkMetaLoadout
             if (string.IsNullOrEmpty(profile)) return;            // No Profile -> nothing persists
             try
             {
-                var f = ProfileStore.GridFile(profile, _runClass);
-                Directory.CreateDirectory(Path.GetDirectoryName(f));
-                File.WriteAllBytes(f, SerializationUtility.SerializeValue(grid.CreateMemento(), DataFormat.JSON));
+                Write(ProfileStore.GridFile(profile, _runClass),
+                      SerializationUtility.SerializeValue(grid.CreateMemento(), DataFormat.JSON));
             }
             catch (Exception e) { Plugin.Log.LogWarning($"SaveGrid P{slot} failed: {e.Message}"); }
         }
@@ -210,11 +265,24 @@ namespace PunkMetaLoadout
             {
                 var vault = ServiceLocator.Get<Vault>();
                 if (vault == null) return;
-                var f = ProfileStore.VaultFile(_runClass);
-                Directory.CreateDirectory(Path.GetDirectoryName(f));
-                File.WriteAllBytes(f, SerializationUtility.SerializeValue(vault.CreateMemento(), DataFormat.JSON));
+                Write(ProfileStore.VaultFile(_runClass),
+                      SerializationUtility.SerializeValue(vault.CreateMemento(), DataFormat.JSON));
             }
             catch (Exception e) { Plugin.Log.LogWarning($"SaveVault failed: {e.Message}"); }
+        }
+
+        /// <summary>Write a snapshot without ever leaving a half-written file behind (these fire on
+        /// every module install, so an alt-F4 mid-write is a real possibility), keeping one .bak per
+        /// file per session of whatever was there when the game started.</summary>
+        private static void Write(string f, byte[] data)
+        {
+            Directory.CreateDirectory(Path.GetDirectoryName(f));
+            if (_backedUp.Add(f) && File.Exists(f))
+                try { File.Copy(f, f + ".bak", true); } catch { }
+            var tmp = f + ".tmp";
+            File.WriteAllBytes(tmp, data);
+            if (File.Exists(f)) File.Delete(f);
+            File.Move(tmp, f);
         }
 
         private static void SaveAll(System.Collections.Generic.IReadOnlyList<Ship> ships)
@@ -224,10 +292,29 @@ namespace PunkMetaLoadout
             SaveVault();
         }
 
-        internal static void OnGameOver()
+        internal static void OnGameOver() => SaveLiveRun();
+
+        /// <summary>The game just wrote its own save — the one its Continue button will reload. Stamp
+        /// the class this run started with onto that save so the continued run finds its own files,
+        /// then flush ours alongside it.</summary>
+        internal static void OnGameSaved()
         {
-            var ships = ServiceLocator.Get<ShipManager>()?.Ships;
-            if (ships != null) SaveAll(ships);
+            ProfileStore.SetLastClass(_isCoop, _runClass);
+            SaveLiveRun();
+        }
+
+        /// <summary>Flush the live run's ships + vault. This is the catch-all for changes no event
+        /// covers — module upgrades bought at a station mutate a module in place without an
+        /// install/uninstall, so without a flush they'd never reach disk.</summary>
+        internal static void SaveLiveRun()
+        {
+            try
+            {
+                var ships = ServiceLocator.Get<ShipManager>()?.Ships;
+                if (ships != null) SaveAll(ships);
+                else SaveVault();
+            }
+            catch (Exception e) { Plugin.Log.LogWarning($"SaveLiveRun failed: {e.Message}"); }
         }
 
         private static ModuleGrid.Memento LoadGrid(string f)
@@ -248,5 +335,23 @@ namespace PunkMetaLoadout
     internal static class VaultStorePatch
     {
         private static void Postfix() => MetaLoadout.SaveVault();
+    }
+
+    // Neither does Vault.Remove(Module) — the module leaving the stash to be installed on the ship.
+    // Without this the vault file keeps listing a module that is now on the grid, and the next
+    // restore hands the player both copies.
+    [HarmonyPatch(typeof(Vault), nameof(Vault.Remove), new[] { typeof(Module) })]
+    internal static class VaultRemoveModulePatch
+    {
+        private static void Postfix() => MetaLoadout.SaveVault();
+    }
+
+    // Quitting through the pause menu (GameController.SaveAndExit) raises no mod-visible event — it
+    // just calls GameSaver.Save and loads the main menu. Mirror every game save with ours so a clean
+    // exit persists exactly what the game itself persisted, and so the save carries its class.
+    [HarmonyPatch(typeof(GameSaver), nameof(GameSaver.Save), new[] { typeof(string) })]
+    internal static class GameSaverSavePatch
+    {
+        private static void Postfix() => MetaLoadout.OnGameSaved();
     }
 }
